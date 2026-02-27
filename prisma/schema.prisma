@@ -1,0 +1,319 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// NextAuth.js account linking table - stores OAuth provider connections
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+/// NextAuth.js session storage for JWT strategy
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// NextAuth.js email verification tokens
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/// Core user authentication and authorization - bridges to Member for camp-specific data
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  member        Member?   /// One-to-one with Member for camp-specific profile data
+  isAdmin       Boolean   @default(false)  /// System admin privileges
+  assignedRecruits Recruit[] @relation("recruitAssignee")  /// Recruits this admin manages
+  lastLoginAt   DateTime?  /// Activity tracking
+  loginCount    Int       @default(0)      /// Login frequency stats
+  activityLogs  ActivityLog[]
+  announcements Announcement[]
+  duesPayments  DuesPayment[]
+}
+
+/// Dues structure - defines what members owe (camp dues, deposits, etc.)
+model DuesItem {
+  id          String   @id @default(cuid())
+  name        String   // "Camp Dues 2026", "Early Bird Deposit", etc.
+  amount      Float    // amount owed per member
+  dueDate     DateTime?
+  description String?
+  active      Boolean  @default(true)
+  payments    DuesPayment[]
+  overrides   DuesOverride[]
+  createdAt   DateTime @default(now())
+}
+
+/// Custom dues amounts per member (scholarships, early bird discounts, etc.)
+model DuesOverride {
+  id         String   @id @default(cuid())
+  userId     String
+  duesItemId String
+  duesItem   DuesItem @relation(fields: [duesItemId], references: [id])
+  amount     Float    // overridden amount for this member
+  reason     String?  // "early bird", "scholarship", etc.
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, duesItemId])
+}
+
+/// Payment tracking - supports partial payments and multiple payment methods
+model DuesPayment {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  duesItemId String
+  duesItem   DuesItem @relation(fields: [duesItemId], references: [id])
+  amount     Float    // amount paid (can be partial)
+  method     String   @default("venmo") // venmo, cash, other
+  note       String?
+  paidAt     DateTime @default(now())
+  recordedBy String?  // admin who recorded it
+  createdAt  DateTime @default(now())
+}
+
+/// Time-limited announcements with emoji and color theming
+model Announcement {
+  id        String   @id @default(cuid())
+  message   String   /// max ~140 chars enforced client-side
+  emoji     String?  /// optional leading emoji for visual flair
+  color     String   @default("indigo") /// theme color: indigo, amber, green, red, purple, pink, cyan
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  expiresAt DateTime /// auto-hide after this time
+  pushedToSignal Boolean @default(false) /// track external notification delivery
+  createdAt DateTime @default(now())
+}
+
+/// User activity audit trail for analytics and debugging
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String   // login, page_view, profile_update, meal_signup, etc.
+  detail    String?  // page path or extra context
+  createdAt DateTime @default(now())
+}
+
+/// Camp-specific member profile - extends User with burn-related data
+model Member {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id])
+  avatar           String?  /// profile photo filename
+  playaName        String?  /// burn/camp nickname
+  pronouns         String?  /// preferred pronouns
+  homeBase         String?  /// default world city/region
+  phone            String?  /// contact number for camp coordination
+  emergencyContact String?  /// safety contact person
+  emergencyPhone   String?  /// emergency contact number
+  vehicle          String?  /// car/rv description for logistics
+  arrivalDate      String?  /// when arriving at burn
+  departureDate    String?  /// when leaving burn
+  campingSetup     String?  /// tent/rv/etc for space planning
+  campRole         String?  /// camp responsibilities/leadership role
+  hasTicket        Boolean  @default(false)
+  ticketSource     String?  // camp, own, gifted, will_call, etc.
+  hasVehiclePass   Boolean  @default(false)
+  vehiclePassSource String? // camp, own, gifted, etc.
+  status           String   @default("active")
+  dietaryNotes     String?
+  duesStatus       String   @default("unpaid")
+  duesAmountPaid   Float    @default(0)
+  duesDate         String?
+  socialCredit     Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  meals            Meal[]
+  shiftSignups     ShiftSignup[]
+  creditLogs       SocialCreditLog[]
+}
+
+/// Recruitment pipeline tracking - potential new members
+model Recruit {
+  id              String   @id @default(cuid())
+  name            String
+  email           String?
+  phone           String?
+  socialHandle    String?
+  referredById    String?  /// member who referred this recruit
+  stage           String   @default("prospect") /// pipeline stage: prospect, contacted, interested, invited, member
+  confidence      Int      @default(50)         /// likelihood of joining (0-100)
+  notes           String?  /// admin notes and conversation history
+  lastContactDate String?  /// when we last reached out
+  assignedToId    String?  /// admin responsible for this recruit
+  assignedTo      User?    @relation("recruitAssignee", fields: [assignedToId], references: [id])
+  intakeId        String?  @unique  /// links to their application form responses
+  intake          RecruitIntake? @relation(fields: [intakeId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+/// Application form responses - detailed recruit questionnaire data
+model RecruitIntake {
+  id                String   @id @default(cuid())
+  namePronouns      String
+  email             String?
+  socialHandle      String?
+  projectDescription String?
+  enthusiasm        String?
+  campScenario      String?  /// scenario response for culture fit assessment
+  gentleReminder    String?  /// how they handle friendly corrections
+  approachStrangers Int?     /// social comfort scale (1-10)
+  theatrical        Int?     /// performance/entertainment scale (1-10)
+  straightFace      Int?     /// serious/grounded scale (1-10)
+  beingApproached   Int?     /// receptiveness to interaction scale (1-10)
+  idealBalance      String?  /// work/play/community balance preference
+  burnExperience    String?
+  campingSetup      String?
+  skillsResources   String?
+  duesQuestions     String?
+  anythingElse      String?
+  recruit           Recruit?
+  createdAt         DateTime @default(now())
+}
+
+/// Meal planning - member commitments to provide camp meals
+model Meal {
+  id           String   @id @default(cuid())
+  memberId     String
+  member       Member   @relation(fields: [memberId], references: [id])
+  mealName     String
+  portions     Int      @default(1)
+  dietaryTags  String?
+  status       String   @default("pledged")
+  createdAt    DateTime @default(now())
+}
+
+/// Work shifts - camp maintenance and operation tasks
+model Shift {
+  id          String        @id @default(cuid())
+  name        String
+  date        String
+  timeStart   String?
+  timeEnd     String?
+  category    String
+  maxSignups  Int           @default(4)
+  description String?
+  signups     ShiftSignup[]
+}
+
+/// Volunteer shift assignments - many-to-many between members and shifts
+model ShiftSignup {
+  id        String   @id @default(cuid())
+  shiftId   String
+  shift     Shift    @relation(fields: [shiftId], references: [id])
+  memberId  String
+  member    Member   @relation(fields: [memberId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([shiftId, memberId])
+}
+
+/// Asset inventory - camp equipment and supplies tracking
+model Asset {
+  id               String   @id @default(cuid())
+  itemName         String
+  category         String   @default("general") /// organization: kitchen, art, structure, etc.
+  qtyNeeded        Int      @default(0)        /// target quantity for camp
+  qtyHave          Int      @default(0)        /// current inventory count
+  custodian        String?  /// member responsible for this asset
+  condition        String?  /// working/damaged/needs repair status
+  storageLocation  String?  /// where it's stored off-playa
+  willBring        String?  /// who's committed to transport it
+  transportVehicle String?  /// vehicle assignment for logistics
+  notes            String?  /// general notes, also used for layout JSON in category="layout"
+  lastInventoried  DateTime? /// when we last physically checked it
+  photoUrl         String?  /// reference image URL
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+/// Gamification system - track member contributions and engagement
+model SocialCreditLog {
+  id        String   @id @default(cuid())
+  memberId  String
+  member    Member   @relation(fields: [memberId], references: [id])
+  activity  String
+  points    Int
+  note      String?
+  loggedBy  String?
+  createdAt DateTime @default(now())
+}
+
+/// Marketing campaign tracking - measure recruitment channel effectiveness
+model Campaign {
+  id          String   @id @default(cuid())
+  name        String   /// human-readable campaign name
+  caseRef     String   @unique /// short code for URL tracking (CF-221, CF-308, etc.)
+  channel     String   /// source platform: facebook, instagram, friend, reddit, etc.
+  launchedAt  DateTime?
+  notes       String?
+  active      Boolean  @default(true)
+  clicks      CampaignClick[]
+  createdAt   DateTime @default(now())
+}
+
+/// Anonymous click tracking for campaign analytics (no personal data stored)
+model CampaignClick {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  createdAt  DateTime @default(now())
+}
+
+/// Burning Man ticket distribution and tracking system
+model Ticket {
+  id             String   @id @default(cuid())
+  type           String   /// ticket type: steward_sale, sap, vehicle_pass, transfer
+  status         String   @default("available") /// workflow: available, requested, assigned, shipped, completed
+  assignedTo     String?  /// user email who gets this ticket
+  requestedBy    String?  /// user email who requested it
+  price          Float?   /// cost if applicable
+  delivery       String?  /// fulfillment method: pickup, mail, will_call
+  trackingNumber String?
+  shippingAddress String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+/// One-time invite codes for secure member registration
+model InviteCode {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  usedBy    String?
+  createdAt DateTime @default(now())
+}

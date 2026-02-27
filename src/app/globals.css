@@ -1,0 +1,335 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #0a0b1e;
+  --bg-secondary: #111236;
+  --bg-card: #161849;
+  --accent: #6366f1;
+  --accent-glow: #818cf8;
+  --text-primary: #e2e8f0;
+  --text-muted: #64748b;
+  --star-color: rgba(255, 255, 255, 0.6);
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Starfield background */
+.starfield {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  background: radial-gradient(ellipse at center, #111236 0%, #0a0b1e 100%);
+}
+
+.starfield::before,
+.starfield::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    radial-gradient(1px 1px at 10% 20%, var(--star-color) 50%, transparent 50%),
+    radial-gradient(1px 1px at 30% 60%, var(--star-color) 50%, transparent 50%),
+    radial-gradient(1px 1px at 50% 10%, var(--star-color) 50%, transparent 50%),
+    radial-gradient(1px 1px at 70% 80%, var(--star-color) 50%, transparent 50%),
+    radial-gradient(1px 1px at 90% 40%, var(--star-color) 50%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 15% 75%, rgba(255,255,255,0.8) 50%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 60% 30%, rgba(255,255,255,0.8) 50%, transparent 50%),
+    radial-gradient(1px 1px at 80% 15%, var(--star-color) 50%, transparent 50%),
+    radial-gradient(1px 1px at 25% 45%, var(--star-color) 50%, transparent 50%),
+    radial-gradient(1px 1px at 45% 90%, var(--star-color) 50%, transparent 50%);
+}
+
+.starfield::after {
+  animation: twinkle 4s ease-in-out infinite alternate;
+  opacity: 0.5;
+}
+
+@keyframes twinkle {
+  0% { opacity: 0.3; }
+  100% { opacity: 0.7; }
+}
+
+/* Glow effects */
+.glow {
+  text-shadow: 0 0 20px rgba(99, 102, 241, 0.5), 0 0 40px rgba(99, 102, 241, 0.3);
+}
+
+.card-glow {
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.form-input {
+  width: 100%;
+  background: #0a0b1e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  padding: 0.625rem 1rem;
+  color: white;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.form-input:focus {
+  border-color: #6366f1;
+}
+
+/* ===== Animated Space Background (Home Hero) ===== */
+
+.stars-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.stars-small {
+  background-image:
+    radial-gradient(1px 1px at 5% 15%, #fff 50%, transparent 50%),
+    radial-gradient(1px 1px at 12% 42%, #fff 50%, transparent 50%),
+    radial-gradient(1px 1px at 18% 78%, #fff 50%, transparent 50%),
+    radial-gradient(1px 1px at 27% 8%, #fff 50%, transparent 50%),
+    radial-gradient(1px 1px at 35% 55%, #fff 50%, transparent 50%),
+    radial-gradient(1px 1px at 43% 22%, #fff 50%, transparent 50%),
+    radial-gradient(1px 1px at 52% 88%, #fff 50%, transparent 50%),
+    radial-gradient(1px 1px at 61% 35%, #fff 50%, transparent 50%),
+    radial-gradient(1px 1px at 68% 62%, #fff 50%, transparent 50%),
+    radial-gradient(1px 1px at 77% 11%, #fff 50%, transparent 50%),
+    radial-gradient(1px 1px at 84% 72%, #fff 50%, transparent 50%),
+    radial-gradient(1px 1px at 92% 48%, #fff 50%, transparent 50%),
+    radial-gradient(1px 1px at 96% 85%, #fff 50%, transparent 50%);
+  animation: twinkle-slow 3s ease-in-out infinite alternate;
+}
+
+.stars-medium {
+  background-image:
+    radial-gradient(1.5px 1.5px at 8% 32%, rgba(165,180,252,0.9) 50%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 22% 68%, rgba(196,181,253,0.9) 50%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 38% 15%, rgba(253,186,116,0.8) 50%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 55% 82%, rgba(165,180,252,0.9) 50%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 72% 45%, rgba(253,224,71,0.7) 50%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 88% 28%, rgba(196,181,253,0.9) 50%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 48% 52%, rgba(165,180,252,0.9) 50%, transparent 50%);
+  animation: twinkle-slow 4s ease-in-out 1s infinite alternate;
+}
+
+.stars-large {
+  background-image:
+    radial-gradient(2.5px 2.5px at 15% 25%, rgba(255,255,255,0.9) 50%, transparent 50%),
+    radial-gradient(2px 2px at 42% 72%, rgba(253,186,116,0.8) 50%, transparent 50%),
+    radial-gradient(2.5px 2.5px at 78% 18%, rgba(196,181,253,0.9) 50%, transparent 50%),
+    radial-gradient(2px 2px at 65% 55%, rgba(165,180,252,0.9) 50%, transparent 50%);
+  animation: twinkle-slow 5s ease-in-out 2s infinite alternate;
+}
+
+@keyframes twinkle-slow {
+  0% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.5; }
+}
+
+/* Floating gas giant planets */
+.planet {
+  position: absolute;
+  border-radius: 50%;
+}
+
+/* Jupiter-like gas giant — purple/violet bands */
+.planet-1 {
+  width: 65px;
+  height: 65px;
+  top: 15%;
+  right: 12%;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(139,92,246,0.6) 0px,
+      rgba(196,181,253,0.4) 4px,
+      rgba(109,40,217,0.7) 8px,
+      rgba(167,139,250,0.5) 12px,
+      rgba(76,29,149,0.8) 16px
+    );
+  border-radius: 50%;
+  box-shadow: 0 0 25px rgba(139,92,246,0.3), inset -12px -6px 18px rgba(0,0,0,0.4), inset 8px 4px 12px rgba(196,181,253,0.2);
+  animation: float-1 20s ease-in-out infinite;
+  opacity: 0.7;
+  overflow: hidden;
+}
+.planet-1::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), transparent 60%);
+}
+
+/* Saturn-like with rings — warm gold/amber bands */
+.planet-2 {
+  width: 40px;
+  height: 40px;
+  top: 65%;
+  left: 8%;
+  background:
+    repeating-linear-gradient(
+      5deg,
+      rgba(245,158,11,0.7) 0px,
+      rgba(253,224,71,0.4) 3px,
+      rgba(180,83,9,0.8) 6px,
+      rgba(251,191,36,0.5) 9px
+    );
+  border-radius: 50%;
+  box-shadow: 0 0 18px rgba(245,158,11,0.25), inset -8px -4px 12px rgba(0,0,0,0.4), inset 5px 3px 8px rgba(253,224,71,0.2);
+  animation: float-2 24s ease-in-out infinite;
+  opacity: 0.6;
+}
+.planet-2::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotateX(70deg);
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 3px solid rgba(251,191,36,0.3);
+  box-shadow: 0 0 0 5px rgba(245,158,11,0.08), 0 0 0 10px rgba(245,158,11,0.04);
+}
+.planet-2::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), transparent 60%);
+}
+
+/* Small icy blue gas giant */
+.planet-3 {
+  width: 24px;
+  height: 24px;
+  top: 35%;
+  left: 18%;
+  background:
+    repeating-linear-gradient(
+      -3deg,
+      rgba(6,182,212,0.7) 0px,
+      rgba(165,243,252,0.4) 2px,
+      rgba(14,116,144,0.8) 4px,
+      rgba(103,232,249,0.3) 6px
+    );
+  border-radius: 50%;
+  box-shadow: 0 0 12px rgba(6,182,212,0.3), inset -5px -3px 8px rgba(0,0,0,0.4), inset 3px 2px 5px rgba(165,243,252,0.2);
+  animation: float-3 28s ease-in-out infinite;
+  opacity: 0.5;
+}
+.planet-3::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2), transparent 60%);
+}
+
+/* Quasar / distant galaxy */
+.quasar {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  top: 22%;
+  left: 72%;
+  opacity: 0.4;
+  animation: float-quasar 25s ease-in-out infinite;
+}
+.quasar::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.9), rgba(165,180,252,0.6) 40%, transparent 70%);
+  box-shadow: 0 0 8px rgba(165,180,252,0.6);
+}
+.quasar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(165,180,252,0.15) 30deg,
+    transparent 60deg,
+    rgba(196,181,253,0.1) 120deg,
+    transparent 180deg,
+    rgba(165,180,252,0.15) 240deg,
+    transparent 300deg,
+    rgba(196,181,253,0.1) 340deg,
+    transparent 360deg
+  );
+  animation: spin-slow 30s linear infinite;
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes float-1 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(-10px, 15px) rotate(2deg); }
+  50% { transform: translate(8px, -12px) rotate(-1deg); }
+  75% { transform: translate(-5px, -8px) rotate(1deg); }
+}
+
+@keyframes float-2 {
+  0%, 100% { transform: translate(0, 0); }
+  33% { transform: translate(12px, -18px); }
+  66% { transform: translate(-8px, 10px); }
+}
+
+@keyframes float-3 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(15px, 12px); }
+}
+
+@keyframes float-quasar {
+  0%, 100% { transform: translate(0, 0); }
+  40% { transform: translate(-6px, 8px); }
+  70% { transform: translate(4px, -5px); }
+}
+
+/* Astronaut easter egg */
+.astronaut {
+  position: fixed;
+  z-index: 100;
+  pointer-events: none;
+  font-size: 32px;
+  animation: astronaut-float 20s linear forwards;
+  filter: drop-shadow(0 0 8px rgba(255,255,255,0.3));
+}
+
+@keyframes astronaut-float {
+  0% {
+    left: -50px;
+    top: 70%;
+    transform: rotate(0deg);
+    opacity: 0;
+  }
+  3% { opacity: 1; }
+  50% {
+    top: 30%;
+    transform: rotate(180deg);
+  }
+  97% { opacity: 1; }
+  100% {
+    left: calc(100vw + 50px);
+    top: 20%;
+    transform: rotate(360deg);
+    opacity: 0;
+  }
+}

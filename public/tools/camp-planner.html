@@ -1,0 +1,1679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camp Layout Planner</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0b1e; color: #e2e8f0; font-family: -apple-system, system-ui, sans-serif; overflow: hidden; }
+  #toolbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 48px; background: #161849;
+    display: flex; align-items: center; padding: 0 16px; gap: 6px; z-index: 100;
+    border-bottom: 1px solid rgba(255,255,255,0.1); flex-wrap: nowrap; overflow-x: auto;
+  }
+  #toolbar h1 { font-size: 13px; font-weight: 600; margin-right: 12px; white-space: nowrap; }
+  .tool-btn {
+    padding: 5px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.05); color: #e2e8f0; font-size: 11px; cursor: pointer;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .tool-btn:hover { background: rgba(255,255,255,0.1); }
+  .tool-btn.accent { background: rgba(79,70,229,0.3); border-color: rgba(79,70,229,0.5); }
+  .tool-btn.accent:hover { background: rgba(79,70,229,0.5); }
+  .tool-btn.active { background: rgba(234,179,8,0.3); border-color: rgba(234,179,8,0.5); }
+  .tool-sep { width: 1px; height: 24px; background: rgba(255,255,255,0.1); margin: 0 2px; flex-shrink: 0; }
+  .lot-input {
+    width: 52px; padding: 3px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.05); color: #e2e8f0; font-size: 11px; text-align: center;
+    -moz-appearance: textfield;
+  }
+  .lot-input::-webkit-inner-spin-button,
+  .lot-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .lot-label { font-size: 11px; color: #94a3b8; white-space: nowrap; }
+  #info {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 32px; background: #161849;
+    display: flex; align-items: center; padding: 0 16px; font-size: 11px; color: #94a3b8;
+    border-top: 1px solid rgba(255,255,255,0.1); z-index: 100; gap: 16px;
+  }
+  #info a { color: #94a3b8; text-decoration: none; }
+  #info a:hover { color: #e2e8f0; }
+  @keyframes starPulse { 0%,100% { color: #c4b5fd; text-shadow: 0 0 4px rgba(196,181,253,0.3); } 50% { color: #f5f3ff; text-shadow: 0 0 8px rgba(196,181,253,0.6), 0 0 16px rgba(139,92,246,0.3); } }
+  #info .star-link { animation: starPulse 3s ease-in-out infinite; }
+  #canvas-wrap {
+    position: fixed; top: 48px; left: 0; right: 0; bottom: 32px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  canvas { cursor: crosshair; }
+  #context-menu {
+    display: none; position: fixed; background: #1e1b4b; border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; padding: 4px; z-index: 200; min-width: 170px;
+  }
+  #context-menu .cm-item {
+    padding: 6px 12px; font-size: 12px; cursor: pointer; border-radius: 4px; color: #e2e8f0;
+  }
+  #context-menu .cm-item:hover { background: rgba(255,255,255,0.1); }
+  #context-menu .cm-item.danger { color: #f87171; }
+  #context-menu .cm-sep { height: 1px; background: rgba(255,255,255,0.1); margin: 2px 0; }
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: #1e1b4b; border: 1px solid rgba(255,255,255,0.15); border-radius: 12px;
+    padding: 24px; min-width: 320px; max-width: 500px; max-height: 80vh; overflow-y: auto;
+  }
+  .modal h2 { font-size: 16px; margin-bottom: 12px; }
+  .modal .roster-item {
+    padding: 8px 12px; border-radius: 6px; cursor: pointer; display: flex;
+    justify-content: space-between; align-items: center; margin: 2px 0;
+  }
+  .modal .roster-item:hover { background: rgba(255,255,255,0.1); }
+  .modal .close-btn { float: right; cursor: pointer; opacity: 0.6; font-size: 18px; }
+  .modal .close-btn:hover { opacity: 1; }
+  .modal label { display: block; font-size: 12px; color: #94a3b8; margin: 8px 0 4px; }
+  .modal input[type="text"], .modal input[type="email"], .modal input[type="tel"] {
+    width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.05); color: #e2e8f0; font-size: 13px;
+  }
+  .modal .save-btn {
+    margin-top: 16px; padding: 8px 24px; border-radius: 6px; border: none;
+    background: rgba(79,70,229,0.5); color: #e2e8f0; font-size: 13px; cursor: pointer;
+  }
+  .modal .save-btn:hover { background: rgba(79,70,229,0.7); }
+  #toast {
+    display: none; position: fixed; bottom: 48px; left: 50%; transform: translateX(-50%);
+    background: #065f46; color: #e2e8f0; padding: 10px 20px; border-radius: 8px;
+    font-size: 13px; z-index: 400; transition: opacity 0.3s;
+  }
+  #toast.show { display: block; }
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <h1>Camp Layout Planner</h1>
+  <span class="lot-label">W:</span>
+  <input type="number" class="lot-input" id="lot-w" value="100" min="50" max="500" step="50" onchange="updateLotSize()">
+  <span class="lot-label">H:</span>
+  <input type="number" class="lot-input" id="lot-h" value="100" min="50" max="500" step="50" onchange="updateLotSize()">
+  <div class="tool-sep"></div>
+  <button class="tool-btn" onclick="addItem('brs24x20')">24×20 BRS</button>
+  <button class="tool-btn" onclick="addItem('brs12x20')">12×20 BRS</button>
+  <div class="tool-sep"></div>
+  <button class="tool-btn" onclick="addItem('tent')">Tent</button>
+  <button class="tool-btn" onclick="addItem('shiftpod')">ShiftPod</button>
+  <button class="tool-btn" onclick="addItem('rv')">RV</button>
+  <div class="tool-sep"></div>
+  <button class="tool-btn" onclick="addItem('entrance')">🚪 Entrance</button>
+  <button class="tool-btn" onclick="addItem('generator')">⚡ Generator</button>
+  <button class="tool-btn" onclick="addItem('fuel')">⛽ Fuel</button>
+  <button class="tool-btn" onclick="addItem('circle')">⭕ Circle</button>
+  <button class="tool-btn" onclick="addItem('polygon')">⬡ Polygon</button>
+  <button class="tool-btn" onclick="startLine('water')" id="water-btn">💧 Water Line</button>
+  <button class="tool-btn" onclick="startLine('power')" id="power-btn">⚡ Power Line</button>
+  <button class="tool-btn" onclick="startLine('fence')" id="fence-btn">🔒 Fence</button>
+  <button class="tool-btn" onclick="startLine('firelane')" id="firelane-btn">🚒 Fire Lane</button>
+  <div class="tool-sep"></div>
+  <button class="tool-btn" onclick="addItem('alum12x10')">Alum 12×10</button>
+  <button class="tool-btn" onclick="addItem('kitchen')">Kitchen</button>
+  <button class="tool-btn" onclick="addItem('bar')">Bar</button>
+  <button class="tool-btn" onclick="addItem('ebike')">Bike Parking</button>
+  <button class="tool-btn" onclick="addItem('solar')">Solar</button>
+  <button class="tool-btn" onclick="addItem('sidehalo')">Side Halo</button>
+  <button class="tool-btn" onclick="addItem('vehicle')">Vehicle</button>
+  <button class="tool-btn" onclick="addItem('tank')">Tank</button>
+  <button class="tool-btn accent" onclick="addItem('generic')">+ Custom</button>
+  <div class="tool-sep"></div>
+  <button class="tool-btn" onclick="openCampInfoModal()">ℹ️ Camp Info</button>
+  <button class="tool-btn" onclick="toggleFrontage()" id="frontage-btn">📏 Frontage</button>
+  <div class="tool-sep"></div>
+  <button class="tool-btn accent" onclick="saveJSON()">💾 Save JSON</button>
+  <button class="tool-btn" onclick="loadJSON()">📂 Load JSON</button>
+  <div class="tool-sep"></div>
+  <button class="tool-btn" onclick="exportJPEG()">📸 Export JPEG</button>
+  <button class="tool-btn" onclick="exportPrintJPEG()">🖨️ Print Export</button>
+  <div class="tool-sep"></div>
+  <button class="tool-btn" onclick="toggleGoldenSpikes()" id="spike-btn">📍 Golden Spikes</button>
+  <button class="tool-btn" onclick="showStreetLabelAction()" id="street-label-btn" style="display:none">🏷️ Show Street Label</button>
+</div>
+<div id="canvas-wrap"><canvas id="c"></canvas></div>
+<div id="info">
+  <span id="mouse-pos">0', 0'</span>
+  <span id="item-count">0 items</span>
+  <span id="brs-count">BRS: 0</span>
+  <span id="shade-area">Shade: 0 sqft</span>
+  <span id="tent-count">Pads: 0/0 assigned</span>
+  <span id="spike-info"></span>
+  <span>Drag=move | R=rotate | D=dupe | Del=delete | Arrow=nudge</span>
+  <span style="margin-left:auto"><a href="https://github.com/davidpotes/ground-truth-community" target="_blank" class="star-link">◆ Ground Truth</a></span>
+</div>
+<div id="context-menu"></div>
+<div class="modal-overlay" id="camper-modal">
+  <div class="modal">
+    <span class="close-btn" onclick="closeCamperModal()">✕</span>
+    <h2 id="camper-modal-title">Assign Camper</h2>
+    <div id="camper-roster-list"></div>
+    <div style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.1);padding-top:12px">
+      <div class="roster-item" onclick="assignCustomCamper()" style="color:#94a3b8;font-style:italic">+ Enter name manually...</div>
+      <div class="roster-item danger" onclick="clearCurrentCamper()" style="color:#f87171" id="clear-camper-btn">✕ Clear assignment</div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="campinfo-modal">
+  <div class="modal">
+    <span class="close-btn" onclick="closeCampInfoModal()">✕</span>
+    <h2>Camp Info</h2>
+    <label>Camp Name</label>
+    <input type="text" id="ci-name">
+    <label>Contact First Name</label>
+    <input type="text" id="ci-first">
+    <label>Contact Last Name</label>
+    <input type="text" id="ci-last">
+    <label>Playa Name (optional)</label>
+    <input type="text" id="ci-playa">
+    <label>Email</label>
+    <input type="email" id="ci-email">
+    <label>Phone</label>
+    <input type="tel" id="ci-phone">
+    <label>Version</label>
+    <input type="text" id="ci-version" placeholder="v1">
+    <button class="save-btn" onclick="saveCampInfo()">Save</button>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+/* ===== CONFIGURATION & CONSTANTS ===== */
+const SCALE = 6;
+let LOT_W = 100;
+let LOT_H = 100;
+const GRID = 2;
+const ANGLED_EXT = 4;
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let campInfo = { name:'', first:'', last:'', playa:'', email:'', phone:'', version:'v1' };
+let lines = [];
+let lineDrawing = null; // { type: 'water'|'power', points: [] }
+let linePreview = null; // { x, y } — snapped cursor position during line drawing
+let frontageEdges = ['bottom'];
+let frontageMode = false;
+let streetLabel = { text: 'STREET', x: null, y: null, visible: true, rotation: 0 };
+let draggingStreetLabel = false;
+let streetLabelDragOff = { x: 0, y: 0 };
+
+function updateCanvasSize() {
+  canvas.width = LOT_W * SCALE;
+  canvas.height = LOT_H * SCALE;
+}
+updateCanvasSize();
+
+function updateLotSize() {
+  let w = parseInt(document.getElementById('lot-w').value) || 100;
+  let h = parseInt(document.getElementById('lot-h').value) || 100;
+  w = Math.max(50, Math.round(w / 50) * 50);
+  h = Math.max(50, Math.round(h / 50) * 50);
+  LOT_W = Math.min(500, w);
+  LOT_H = Math.min(500, h);
+  document.getElementById('lot-w').value = LOT_W;
+  document.getElementById('lot-h').value = LOT_H;
+  updateCanvasSize();
+  if (showSpikes) computeGoldenSpikes();
+  draw();
+}
+
+/* ===== ELEMENT TYPES & DEFAULTS ===== */
+const TYPES = {
+  brs24x20:  { w: 24, h: 20, color: '#4f46e5', label: 'BRS 24×20', cat: 'brs' },
+  brs12x20:  { w: 12, h: 20, color: '#6366f1', label: 'BRS 12×20', cat: 'brs' },
+  tent:      { w: 12, h: 12, color: '#065f46', label: 'Tent', cat: 'camp', resizable: true },
+  shiftpod:  { w: 12, h: 14, color: '#047857', label: 'ShiftPod', cat: 'camp', resizable: true },
+  rv:        { w: 10, h: 30, color: '#374151', label: 'RV', cat: 'vehicle', resizable: true },
+  entrance:  { w: 4,  h: 2,  color: '#22c55e', label: 'Entrance', cat: 'func', resizable: true },
+  generator: { w: 4,  h: 4,  color: '#ef4444', label: 'Generator', cat: 'func' },
+  fuel:      { w: 4,  h: 4,  color: '#f97316', label: 'Fuel Storage', cat: 'func' },
+  circle:    { w: 10, h: 10, color: '#6b7280', label: 'Circle', cat: 'func', resizable: true },
+  polygon:   { w: 10, h: 10, color: '#6b7280', label: 'Polygon', cat: 'func', resizable: true },
+  alum12x10: { w: 12, h: 10, color: '#a16207', label: 'Alum 12×10', cat: 'shade' },
+  kitchen:   { w: 12, h: 8,  color: '#0891b2', label: 'Kitchen', cat: 'func', resizable: true },
+  bar:       { w: 10, h: 6,  color: '#7c3aed', label: 'Bar', cat: 'func', resizable: true },
+  ebike:     { w: 8,  h: 4,  color: '#059669', label: 'Bike Parking', cat: 'func', resizable: true },
+  solar:     { w: 10, h: 8,  color: '#f59e0b', label: 'Solar', cat: 'func', resizable: true },
+  sidehalo:  { w: 10, h: 6,  color: '#b45309', label: 'Side Halo 10\'', cat: 'halo', resizable: true },
+  vehicle:   { w: 6,  h: 16, color: '#4b5563', label: 'Vehicle', cat: 'vehicle' },
+  tank:      { w: 4,  h: 4,  color: '#0e7490', label: 'Tank', cat: 'func' },
+  generic:   { w: 10, h: 10, color: '#6b7280', label: 'Custom', cat: 'func', resizable: true },
+};
+
+let items = [];
+let dragging = null;
+let dragOff = { x: 0, y: 0 };
+let selected = null;
+let hoveredItem = null;
+let resizing = null;
+let camperModalTarget = null;
+
+function snap(v) { return Math.round(v / GRID) * GRID; }
+function toFeet(px) { return px / SCALE; }
+function toPx(ft) { return ft * SCALE; }
+
+function addItem(type) {
+  if (lineDrawing) finishLine();
+  const t = TYPES[type];
+  items.push({
+    type, x: snap(Math.floor(LOT_W/2) - t.w/2), y: snap(Math.floor(LOT_H/2) - t.h/2),
+    w: t.w, h: t.h, label: t.label, id: Date.now() + Math.random(),
+    camper: null, rotation: 0
+  });
+  selected = items[items.length - 1];
+  if (showSpikes) computeGoldenSpikes();
+  draw();
+}
+
+function toast(msg, ms) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show';
+  setTimeout(() => { t.className = ''; }, ms || 3000);
+}
+
+function getExteriorEdges(shadeItem) {
+  const edges = { top: true, bottom: true, left: true, right: true };
+  const P = 2;
+  for (const other of items) {
+    if (other.id === shadeItem.id) continue;
+    const ot = TYPES[other.type];
+    if (ot.cat !== 'brs' && ot.cat !== 'shade') continue;
+    const overlapX = other.x < shadeItem.x + shadeItem.w + P && other.x + other.w > shadeItem.x - P;
+    const overlapY = other.y < shadeItem.y + shadeItem.h + P && other.y + other.h > shadeItem.y - P;
+    if (overlapX && Math.abs(other.y + other.h - shadeItem.y) < P + 1) edges.top = false;
+    if (overlapX && Math.abs(other.y - (shadeItem.y + shadeItem.h)) < P + 1) edges.bottom = false;
+    if (overlapY && Math.abs(other.x + other.w - shadeItem.x) < P + 1) edges.left = false;
+    if (overlapY && Math.abs(other.x - (shadeItem.x + shadeItem.w)) < P + 1) edges.right = false;
+  }
+  return edges;
+}
+
+/* ===== LINE DRAWING (WATER/POWER/FENCE/FIRE LANE) ===== */
+function snapCardinal(from, to) {
+  // Snap to nearest cardinal/45° direction from 'from' point
+  const dx = to.x - from.x, dy = to.y - from.y;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  if (dist < 1) return { x: snap(to.x), y: snap(to.y) };
+  const angle = Math.atan2(dy, dx);
+  // Snap angle to nearest 45° increment
+  const snapped = Math.round(angle / (Math.PI/4)) * (Math.PI/4);
+  return { x: snap(from.x + Math.cos(snapped) * dist), y: snap(from.y + Math.sin(snapped) * dist) };
+}
+
+function startLine(type) {
+  if (lineDrawing) finishLine();
+  if (frontageMode) toggleFrontage();
+  lineDrawing = { type, points: [], id: Date.now() };
+  linePreview = null;
+  document.getElementById(type + '-btn').classList.add('active');
+  canvas.style.cursor = 'crosshair';
+  toast('Click to place points. Lines snap to cardinal directions. Double-click or Escape to finish.', 3000);
+  draw();
+}
+
+function finishLine() {
+  if (!lineDrawing) return;
+  if (lineDrawing.points.length >= 2) {
+    lines.push({ type: lineDrawing.type, points: lineDrawing.points, id: lineDrawing.id });
+  }
+  document.getElementById(lineDrawing.type + '-btn').classList.remove('active');
+  lineDrawing = null;
+  draw();
+}
+
+function findNearestLine(fx, fy, thresholdFt) {
+  thresholdFt = thresholdFt || 5;
+  let best = null, bestDist = thresholdFt;
+  for (const line of lines) {
+    for (let i = 0; i < line.points.length - 1; i++) {
+      const a = line.points[i], b = line.points[i+1];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len2 = dx*dx + dy*dy;
+      if (len2 === 0) continue;
+      let t = ((fx - a.x)*dx + (fy - a.y)*dy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const px = a.x + t*dx, py = a.y + t*dy;
+      const d = Math.sqrt((fx-px)**2 + (fy-py)**2);
+      if (d < bestDist) { bestDist = d; best = line; }
+    }
+  }
+  return best;
+}
+
+// ===== FRONTAGE =====
+function toggleFrontage() {
+  if (lineDrawing) finishLine();
+  frontageMode = !frontageMode;
+  document.getElementById('frontage-btn').classList.toggle('active', frontageMode);
+  if (frontageMode) toast('Click near any lot edge to toggle frontage. Click the button again or press Escape to exit.', 4000);
+}
+
+function handleFrontageClick(fx, fy) {
+  const margin = LOT_W * 0.15;
+  const marginY = LOT_H * 0.15;
+  let edge = null;
+  if (fy < marginY && fy < fx && fy < LOT_W - fx) edge = 'top';
+  else if (fy > LOT_H - marginY && LOT_H - fy < fx && LOT_H - fy < LOT_W - fx) edge = 'bottom';
+  else if (fx < margin) edge = 'left';
+  else if (fx > LOT_W - margin) edge = 'right';
+  if (!edge) { toast('Click closer to a lot edge', 2000); return; }
+  const idx = frontageEdges.indexOf(edge);
+  if (idx >= 0) { frontageEdges.splice(idx, 1); toast('Removed ' + edge + ' frontage', 2000); }
+  else { frontageEdges.push(edge); toast('Added ' + edge + ' frontage', 2000); }
+  draw();
+}
+
+// ===== CAMP INFO =====
+function openCampInfoModal() {
+  document.getElementById('ci-name').value = campInfo.name || '';
+  document.getElementById('ci-first').value = campInfo.first || '';
+  document.getElementById('ci-last').value = campInfo.last || '';
+  document.getElementById('ci-playa').value = campInfo.playa || '';
+  document.getElementById('ci-email').value = campInfo.email || '';
+  document.getElementById('ci-phone').value = campInfo.phone || '';
+  document.getElementById('ci-version').value = campInfo.version || 'v1';
+  document.getElementById('campinfo-modal').classList.add('show');
+}
+function closeCampInfoModal() { document.getElementById('campinfo-modal').classList.remove('show'); }
+function saveCampInfo() {
+  campInfo.name = document.getElementById('ci-name').value;
+  campInfo.first = document.getElementById('ci-first').value;
+  campInfo.last = document.getElementById('ci-last').value;
+  campInfo.playa = document.getElementById('ci-playa').value;
+  campInfo.email = document.getElementById('ci-email').value;
+  campInfo.phone = document.getElementById('ci-phone').value;
+  campInfo.version = document.getElementById('ci-version').value;
+  closeCampInfoModal();
+  draw();
+  toast('Camp info saved', 2000);
+}
+
+/* ===== CANVAS RENDERING ===== */
+function drawOctagon(ctx, x, y, w, h) {
+  const inset = Math.min(w, h) * 0.3;
+  ctx.beginPath();
+  ctx.moveTo(x + inset, y);
+  ctx.lineTo(x + w - inset, y);
+  ctx.lineTo(x + w, y + inset);
+  ctx.lineTo(x + w, y + h - inset);
+  ctx.lineTo(x + w - inset, y + h);
+  ctx.lineTo(x + inset, y + h);
+  ctx.lineTo(x, y + h - inset);
+  ctx.lineTo(x, y + inset);
+  ctx.closePath();
+}
+
+function drawRadiusCircles(ctx, cx, cy, radii, color, scale) {
+  scale = scale || 1;
+  ctx.save();
+  for (const r of radii) {
+    const rpx = toPx(r) * scale;
+    ctx.beginPath();
+    ctx.arc(cx, cy, rpx, 0, Math.PI * 2);
+    ctx.fillStyle = color + '0d'; // 0.05 alpha
+    ctx.fill();
+    ctx.setLineDash([4*scale, 4*scale]);
+    ctx.strokeStyle = color + '80';
+    ctx.lineWidth = 1 * scale;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = color + 'cc';
+    ctx.font = (9*scale) + 'px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(r + "'", cx, cy - rpx - 2*scale);
+  }
+  ctx.restore();
+}
+
+function getLineStyle(type) {
+  if (type === 'water') return { color: '#3b82f6', dash: [8, 4], width: 3 };
+  if (type === 'power') return { color: '#eab308', dash: [4, 4], width: 3 };
+  if (type === 'fence') return { color: '#78716c', dash: [], width: 2 };
+  if (type === 'firelane') return { color: 'rgba(239,68,68,0.4)', dash: [], width: 3 };
+  return { color: '#fff', dash: [], width: 2 };
+}
+
+function drawFenceTicks(ctx, points, scale) {
+  const tickLen = 4 * scale;
+  const spacingFt = 4;
+  for (let i = 0; i < points.length - 1; i++) {
+    const ax = toPx(points[i].x)*scale, ay = toPx(points[i].y)*scale;
+    const bx = toPx(points[i+1].x)*scale, by = toPx(points[i+1].y)*scale;
+    const dx = bx - ax, dy = by - ay;
+    const segLen = Math.sqrt(dx*dx + dy*dy);
+    if (segLen === 0) continue;
+    const nx = -dy / segLen, ny = dx / segLen;
+    const spacingPx = toPx(spacingFt) * scale;
+    let d = spacingPx;
+    let side = 1;
+    while (d < segLen) {
+      const px = ax + (dx * d / segLen), py = ay + (dy * d / segLen);
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(px + nx * tickLen * side, py + ny * tickLen * side);
+      ctx.stroke();
+      d += spacingPx;
+      side *= -1;
+    }
+  }
+}
+
+function drawFireLane(ctx, points, scale, isPrint) {
+  if (points.length < 2) return;
+  const corridorW = toPx(20) * scale / 2;
+  ctx.save();
+  // Draw corridor
+  for (let i = 0; i < points.length - 1; i++) {
+    const ax = toPx(points[i].x)*scale, ay = toPx(points[i].y)*scale;
+    const bx = toPx(points[i+1].x)*scale, by = toPx(points[i+1].y)*scale;
+    const dx = bx - ax, dy = by - ay;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if (len === 0) continue;
+    const nx = -dy / len * corridorW, ny = dx / len * corridorW;
+
+    // Fill
+    ctx.beginPath();
+    ctx.moveTo(ax + nx, ay + ny); ctx.lineTo(bx + nx, by + ny);
+    ctx.lineTo(bx - nx, by - ny); ctx.lineTo(ax - nx, ay - ny);
+    ctx.closePath();
+    ctx.fillStyle = isPrint ? 'rgba(0,0,0,0.08)' : 'rgba(239,68,68,0.15)';
+    ctx.fill();
+
+    // Border dashes
+    ctx.setLineDash([6*scale, 4*scale]);
+    ctx.strokeStyle = isPrint ? '#000' : 'rgba(239,68,68,0.4)';
+    ctx.lineWidth = 1.5 * scale;
+    ctx.beginPath(); ctx.moveTo(ax + nx, ay + ny); ctx.lineTo(bx + nx, by + ny); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ax - nx, ay - ny); ctx.lineTo(bx - nx, by - ny); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Label along center
+  const mid = Math.floor(points.length / 2);
+  const mx = toPx(points[mid].x)*scale, my = toPx(points[mid].y)*scale;
+  ctx.fillStyle = isPrint ? '#000' : 'rgba(239,68,68,0.7)';
+  ctx.font = 'bold ' + (10*scale) + 'px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('FIRE LANE 20\'', mx, my - 2*scale);
+  ctx.restore();
+}
+
+function drawLines(ctx, lineArr, scale, isPrint) {
+  scale = scale || 1;
+  for (const line of lineArr) {
+    if (line.points.length < 2) continue;
+    if (line.type === 'firelane') { drawFireLane(ctx, line.points, scale, isPrint); continue; }
+    const style = getLineStyle(line.type);
+    ctx.save();
+    ctx.strokeStyle = style.color;
+    ctx.lineWidth = style.width * scale;
+    ctx.setLineDash(style.dash.map(d => d * scale));
+    ctx.beginPath();
+    ctx.moveTo(toPx(line.points[0].x)*scale, toPx(line.points[0].y)*scale);
+    for (let i = 1; i < line.points.length; i++) {
+      ctx.lineTo(toPx(line.points[i].x)*scale, toPx(line.points[i].y)*scale);
+    }
+    ctx.stroke();
+    if (line.type === 'fence') drawFenceTicks(ctx, line.points, scale);
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+  // Draw in-progress line
+  if (lineDrawing && lineDrawing.points.length >= 1) {
+    const previewPts = linePreview ? [...lineDrawing.points, linePreview] : lineDrawing.points;
+    if (lineDrawing.type === 'firelane' && previewPts.length >= 2) {
+      drawFireLane(ctx, previewPts, scale, false);
+    } else {
+      const style = getLineStyle(lineDrawing.type);
+      ctx.save();
+      ctx.strokeStyle = style.color;
+      ctx.lineWidth = style.width * scale;
+      ctx.setLineDash(style.dash.map(d => d * scale));
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(toPx(lineDrawing.points[0].x)*scale, toPx(lineDrawing.points[0].y)*scale);
+      for (let i = 1; i < lineDrawing.points.length; i++) {
+        ctx.lineTo(toPx(lineDrawing.points[i].x)*scale, toPx(lineDrawing.points[i].y)*scale);
+      }
+      ctx.stroke();
+      if (lineDrawing.type === 'fence') drawFenceTicks(ctx, lineDrawing.points, scale);
+      // Preview line from last point to snapped cursor
+      if (linePreview) {
+        const lp = lineDrawing.points[lineDrawing.points.length - 1];
+        ctx.beginPath();
+        ctx.moveTo(toPx(lp.x)*scale, toPx(lp.y)*scale);
+        ctx.lineTo(toPx(linePreview.x)*scale, toPx(linePreview.y)*scale);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  }
+}
+
+function drawFrontageEdges(ctx, scale, color, labelColor) {
+  scale = scale || 1;
+  color = color || '#22c55e';
+  labelColor = labelColor || '#22c55e';
+  const W = LOT_W * SCALE * scale, H = LOT_H * SCALE * scale;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 4 * scale;
+  ctx.fillStyle = labelColor;
+  ctx.font = 'bold ' + (11*scale) + 'px system-ui';
+  ctx.textAlign = 'center';
+  for (const edge of frontageEdges) {
+    ctx.beginPath();
+    if (edge === 'bottom') { ctx.moveTo(0, H); ctx.lineTo(W, H); ctx.stroke(); ctx.fillText('FRONTAGE', W/2, H - 6*scale); }
+    if (edge === 'top') { ctx.moveTo(0, 0); ctx.lineTo(W, 0); ctx.stroke(); ctx.fillText('FRONTAGE', W/2, 14*scale); }
+    if (edge === 'left') { ctx.moveTo(0, 0); ctx.lineTo(0, H); ctx.stroke(); ctx.save(); ctx.translate(14*scale, H/2); ctx.rotate(-Math.PI/2); ctx.fillText('FRONTAGE', 0, 0); ctx.restore(); }
+    if (edge === 'right') { ctx.moveTo(W, 0); ctx.lineTo(W, H); ctx.stroke(); ctx.save(); ctx.translate(W-6*scale, H/2); ctx.rotate(Math.PI/2); ctx.fillText('FRONTAGE', 0, 0); ctx.restore(); }
+  }
+  ctx.restore();
+}
+
+function drawItemShape(ctx, item, x, y, w, h, fillStyle, strokeStyle, lineWidth, isDashed) {
+  if (item.type === 'circle') {
+    ctx.beginPath();
+    ctx.ellipse(x + w/2, y + h/2, w/2, h/2, 0, 0, Math.PI*2);
+    ctx.fillStyle = fillStyle;
+    ctx.fill();
+    if (isDashed) ctx.setLineDash([4,4]); else ctx.setLineDash([]);
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  } else if (item.type === 'polygon') {
+    drawOctagon(ctx, x, y, w, h);
+    ctx.fillStyle = fillStyle;
+    ctx.fill();
+    if (isDashed) ctx.setLineDash([4,4]); else ctx.setLineDash([]);
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  } else {
+    ctx.fillStyle = fillStyle;
+    ctx.fillRect(x, y, w, h);
+    if (isDashed) ctx.setLineDash([4,4]); else ctx.setLineDash([]);
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = lineWidth;
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+  }
+}
+
+// ===== STREET LABEL =====
+function getStreetLabelPos() {
+  // Default positions if not set
+  if (streetLabel.x === null) { streetLabel.x = LOT_W / 2; streetLabel.y = LOT_H + 4; }
+  return { x: streetLabel.x, y: streetLabel.y };
+}
+
+function drawStreetLabel(c, scale) {
+  if (!streetLabel.visible) return;
+  scale = scale || 1;
+  const pos = getStreetLabelPos();
+  const px = toPx(pos.x) * scale, py = toPx(pos.y) * scale;
+  c.save();
+  c.translate(px, py);
+  c.rotate(streetLabel.rotation * Math.PI / 180);
+  c.fillStyle = 'rgba(255,255,255,0.3)';
+  c.font = (11 * scale) + 'px system-ui';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText('=== ' + streetLabel.text + ' ===', 0, 0);
+  c.restore();
+}
+
+function drawStreetLabelPrint(c, scale) {
+  if (!streetLabel.visible) return;
+  const pos = getStreetLabelPos();
+  const px = toPx(pos.x) * scale, py = toPx(pos.y) * scale;
+  c.save();
+  c.translate(px, py);
+  c.rotate(streetLabel.rotation * Math.PI / 180);
+  c.fillStyle = '#000';
+  c.font = 'bold ' + (11 * scale) + 'px system-ui';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText('=== ' + streetLabel.text + ' ===', 0, 0);
+  c.restore();
+}
+
+function streetLabelHitTest(fx, fy) {
+  if (!streetLabel.visible) return false;
+  const pos = getStreetLabelPos();
+  // Approximate hit box: 30ft wide, 4ft tall centered on label position
+  const hw = 15, hh = 2;
+  return Math.abs(fx - pos.x) < hw && Math.abs(fy - pos.y) < hh;
+}
+
+function showStreetLabelAction() {
+  streetLabel.visible = true;
+  document.getElementById('street-label-btn').style.display = 'none';
+  draw();
+}
+
+function showStreetLabelContextMenu(cx, cy) {
+  const menu = document.getElementById('context-menu');
+  menu.innerHTML = `
+    <div class="cm-item" style="color:#94a3b8;font-weight:600;cursor:default">Street Label</div>
+    <div class="cm-sep"></div>
+    <div class="cm-item" onclick="renameStreetLabel()">✏️ Rename</div>
+    <div class="cm-item" onclick="moveStreetLabel('bottom')">⬇ Move to Bottom</div>
+    <div class="cm-item" onclick="moveStreetLabel('top')">⬆ Move to Top</div>
+    <div class="cm-item" onclick="moveStreetLabel('left')">⬅ Move to Left</div>
+    <div class="cm-item" onclick="moveStreetLabel('right')">➡ Move to Right</div>
+    <div class="cm-sep"></div>
+    <div class="cm-item danger" onclick="hideStreetLabel()">👁 Hide</div>
+  `;
+  menu.style.display = 'block';
+  menu.style.left = Math.min(cx, window.innerWidth - 180) + 'px';
+  menu.style.top = Math.min(cy, window.innerHeight - 250) + 'px';
+}
+
+function renameStreetLabel() {
+  const n = prompt('Street label text:', streetLabel.text);
+  if (n) streetLabel.text = n;
+  hideContextMenu(); draw();
+}
+
+function moveStreetLabel(edge) {
+  if (edge === 'bottom') { streetLabel.x = LOT_W / 2; streetLabel.y = LOT_H + 4; streetLabel.rotation = 0; }
+  if (edge === 'top') { streetLabel.x = LOT_W / 2; streetLabel.y = -4; streetLabel.rotation = 0; }
+  if (edge === 'left') { streetLabel.x = -4; streetLabel.y = LOT_H / 2; streetLabel.rotation = -90; }
+  if (edge === 'right') { streetLabel.x = LOT_W + 4; streetLabel.y = LOT_H / 2; streetLabel.rotation = 90; }
+  hideContextMenu(); draw();
+}
+
+function hideStreetLabel() {
+  streetLabel.visible = false;
+  document.getElementById('street-label-btn').style.display = '';
+  hideContextMenu(); draw();
+}
+
+// ===== ROTATION HELPERS =====
+function getItemAABB(item) {
+  const rot = (item.rotation || 0) * Math.PI / 180;
+  if (rot === 0) return { x: item.x, y: item.y, w: item.w, h: item.h };
+  const cx = item.x + item.w / 2, cy = item.y + item.h / 2;
+  const hw = item.w / 2, hh = item.h / 2;
+  const cos = Math.abs(Math.cos(rot)), sin = Math.abs(Math.sin(rot));
+  const bw = hw * cos + hh * sin, bh = hw * sin + hh * cos;
+  return { x: cx - bw, y: cy - bh, w: bw * 2, h: bh * 2 };
+}
+
+function clampItemToLot(item) {
+  const bb = getItemAABB(item);
+  if (bb.x < 0) item.x -= bb.x;
+  if (bb.y < 0) item.y -= bb.y;
+  if (bb.x + bb.w > LOT_W) item.x -= (bb.x + bb.w - LOT_W);
+  if (bb.y + bb.h > LOT_H) item.y -= (bb.y + bb.h - LOT_H);
+}
+
+function drawRotatedItem(c, item, drawFn) {
+  const rot = item.rotation || 0;
+  if (rot === 0) { drawFn(toPx(item.x), toPx(item.y), toPx(item.w), toPx(item.h)); return; }
+  c.save();
+  const cx = toPx(item.x + item.w / 2), cy = toPx(item.y + item.h / 2);
+  c.translate(cx, cy);
+  c.rotate(rot * Math.PI / 180);
+  drawFn(-toPx(item.w) / 2, -toPx(item.h) / 2, toPx(item.w), toPx(item.h));
+  c.restore();
+}
+
+function drawRotatedItemScaled(c, item, scale, drawFn) {
+  const rot = item.rotation || 0;
+  if (rot === 0) { drawFn(toPx(item.x)*scale, toPx(item.y)*scale, toPx(item.w)*scale, toPx(item.h)*scale); return; }
+  c.save();
+  const cx = toPx(item.x + item.w / 2) * scale, cy = toPx(item.y + item.h / 2) * scale;
+  c.translate(cx, cy);
+  c.rotate(rot * Math.PI / 180);
+  drawFn(-toPx(item.w)*scale / 2, -toPx(item.h)*scale / 2, toPx(item.w)*scale, toPx(item.h)*scale);
+  c.restore();
+}
+
+// ===== DRAWING =====
+function draw() {
+  const W = LOT_W * SCALE, H = LOT_H * SCALE;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, W, H);
+
+  // Camp name at top
+  if (campInfo.name) {
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = 'bold 18px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(campInfo.name, W/2, 24);
+  }
+
+  // Grid 10ft
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
+  for (let i = 0; i <= LOT_W; i += 10) { ctx.beginPath(); ctx.moveTo(toPx(i), 0); ctx.lineTo(toPx(i), H); ctx.stroke(); }
+  for (let i = 0; i <= LOT_H; i += 10) { ctx.beginPath(); ctx.moveTo(0, toPx(i)); ctx.lineTo(W, toPx(i)); ctx.stroke(); }
+  // Grid 2ft
+  ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+  for (let i = 0; i <= LOT_W; i += 2) { ctx.beginPath(); ctx.moveTo(toPx(i), 0); ctx.lineTo(toPx(i), H); ctx.stroke(); }
+  for (let i = 0; i <= LOT_H; i += 2) { ctx.beginPath(); ctx.moveTo(0, toPx(i)); ctx.lineTo(W, toPx(i)); ctx.stroke(); }
+
+  // Street label
+  drawStreetLabel(ctx, 1);
+
+  // Scale
+  ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.font = '9px system-ui'; ctx.textAlign = 'left';
+  for (let i = 0; i <= LOT_W; i += 10) ctx.fillText(i + "'", toPx(i) + 2, 10);
+  for (let i = 0; i <= LOT_H; i += 10) ctx.fillText(i + "'", 2, toPx(i) + 10);
+
+  const order = ['shade', 'halo', 'camp', 'vehicle', 'brs', 'func', 'art'];
+  const sorted = [...items].sort((a, b) => order.indexOf(TYPES[a.type].cat) - order.indexOf(TYPES[b.type].cat));
+
+  for (const item of sorted) {
+    const t = TYPES[item.type];
+    const isSel = selected && selected.id === item.id;
+    const isHov = hoveredItem && hoveredItem.id === item.id;
+    const itemColor = item.customColor || t.color;
+    const fillAlpha = (t.cat === 'shade' || t.cat === 'halo') ? '40' : '80';
+    const isDashed = (t.cat === 'shade' || t.cat === 'halo');
+    const strokeColor = isSel ? '#facc15' : (isHov ? '#94a3b8' : itemColor);
+    const lw = isSel ? 2 : 1;
+
+    drawRotatedItem(ctx, item, (x, y, w, h) => {
+      if (t.cat === 'brs') { ctx.fillStyle = 'rgba(79,70,229,0.08)'; ctx.fillRect(x-4,y-4,w+8,h+8); }
+      drawItemShape(ctx, item, x, y, w, h, itemColor + fillAlpha, strokeColor, lw, isDashed);
+
+      // Angled side halos — drawn inside rotation context so they rotate with the item
+      if (t.cat === 'brs' || t.cat === 'shade') {
+        const edges = getExteriorEdges(item);
+        if (edges.top || edges.bottom || edges.left || edges.right) {
+          const ext = toPx(ANGLED_EXT);
+          ctx.fillStyle = 'rgba(161,98,7,0.15)'; ctx.strokeStyle = 'rgba(161,98,7,0.3)';
+          ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+          if (edges.top) { ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+w,y); ctx.lineTo(x+w+(edges.right?ext:0),y-ext); ctx.lineTo(x-(edges.left?ext:0),y-ext); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+          if (edges.bottom) { ctx.beginPath(); ctx.moveTo(x,y+h); ctx.lineTo(x+w,y+h); ctx.lineTo(x+w+(edges.right?ext:0),y+h+ext); ctx.lineTo(x-(edges.left?ext:0),y+h+ext); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+          if (edges.left) { ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y+h); ctx.lineTo(x-ext,y+h+(edges.bottom?ext:0)); ctx.lineTo(x-ext,y-(edges.top?ext:0)); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+          if (edges.right) { ctx.beginPath(); ctx.moveTo(x+w,y); ctx.lineTo(x+w,y+h); ctx.lineTo(x+w+ext,y+h+(edges.bottom?ext:0)); ctx.lineTo(x+w+ext,y-(edges.top?ext:0)); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+          ctx.setLineDash([]);
+        }
+      }
+
+      // Label
+      ctx.fillStyle = isSel ? '#facc15' : '#e2e8f0';
+      ctx.font = (w < toPx(8)) ? '9px system-ui' : '11px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(item.label, x + w/2, y + h/2 + (item.camper ? -2 : 4));
+      if (item.camper) { ctx.fillStyle = '#fbbf24'; ctx.font = '9px system-ui'; ctx.fillText(item.camper, x + w/2, y + h/2 + 12); }
+      if (isSel || isHov) { ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '9px system-ui'; ctx.fillText(item.w + 'x' + item.h + ((item.rotation||0) ? ' ∠'+item.rotation+'°' : ''), x + w/2, y + h/2 + (item.camper ? 24 : 16)); }
+    });
+
+    // Radius circles (unrotated, centered on item)
+    const cx = toPx(item.x + item.w/2), cy = toPx(item.y + item.h/2);
+    if (item.type === 'fuel') drawRadiusCircles(ctx, cx, cy, [10, 20, 50], '#ef4444');
+    else if (item.type === 'generator') drawRadiusCircles(ctx, cx, cy, [10], '#ef4444');
+
+    // Selection handles at rotated corners (not AABB)
+    if (isSel) {
+      const rot = (item.rotation || 0) * Math.PI / 180;
+      const icx = toPx(item.x + item.w/2), icy = toPx(item.y + item.h/2);
+      const hw = toPx(item.w)/2, hh = toPx(item.h)/2;
+      const hs = 4; ctx.fillStyle = '#facc15';
+      if (item.type === 'circle') {
+        // Cardinal handles for circles
+        const cardinals = [[0,-hh],[hw,0],[0,hh],[-hw,0]];
+        cardinals.slice(0,3).forEach(([rx,ry]) => {
+          const px = icx + rx*Math.cos(rot) - ry*Math.sin(rot);
+          const py = icy + rx*Math.sin(rot) + ry*Math.cos(rot);
+          ctx.beginPath(); ctx.arc(px, py, hs/2+1, 0, Math.PI*2); ctx.fill();
+        });
+      } else {
+        const corners = [[-hw,-hh],[hw,-hh],[-hw,hh]];
+        corners.forEach(([rx,ry]) => {
+          const px = icx + rx*Math.cos(rot) - ry*Math.sin(rot);
+          const py = icy + rx*Math.sin(rot) + ry*Math.cos(rot);
+          ctx.fillRect(px-hs/2,py-hs/2,hs,hs);
+        });
+      }
+      const isR = TYPES[item.type].resizable;
+      ctx.fillStyle = isR ? '#f97316' : '#facc15';
+      const rhs = isR ? 8 : 4;
+      // Bottom-right / right-bottom handle (rotated)
+      const brx = icx + hw*Math.cos(rot) - hh*Math.sin(rot);
+      const bry = icy + hw*Math.sin(rot) + hh*Math.cos(rot);
+      if (item.type === 'circle') { ctx.beginPath(); ctx.arc(brx, bry, rhs/2+1, 0, Math.PI*2); ctx.fill(); }
+      else ctx.fillRect(brx-rhs/2,bry-rhs/2,rhs,rhs);
+      if (isR) { ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.strokeRect(brx-rhs/2,bry-rhs/2,rhs,rhs); }
+    }
+  }
+
+  // Lines
+  drawLines(ctx, lines);
+
+  // Frontage
+  drawFrontageEdges(ctx);
+
+  drawGoldenSpikes(ctx);
+
+  // Info bar
+  document.getElementById('item-count').textContent = items.length + ' items';
+  document.getElementById('brs-count').textContent = 'BRS: ' + items.filter(i => TYPES[i.type].cat === 'brs').length;
+  const shadeCats = ['brs','shade','halo'];
+  const sa = items.filter(i => shadeCats.includes(TYPES[i.type].cat)).reduce((s, i) => s + i.w * i.h, 0);
+  document.getElementById('shade-area').textContent = 'Shade: ' + sa.toLocaleString() + ' sqft';
+  const pads = items.filter(i => i.type === 'tent' || i.type === 'shiftpod');
+  document.getElementById('tent-count').textContent = 'Pads: ' + pads.length + '/' + pads.filter(p => p.camper).length + ' assigned';
+  const spikeEl = document.getElementById('spike-info');
+  if (showSpikes && goldenSpikes.length > 0) {
+    spikeEl.textContent = 'Spikes: ' + goldenSpikes.map(sp => sp.label + '(' + sp.x + ',' + (LOT_H-sp.y) + ')').join(' ');
+    spikeEl.style.color = '#eab308';
+  } else {
+    spikeEl.textContent = '';
+  }
+}
+
+/* ===== DRAG & DROP HANDLING ===== */
+function getMouseFeet(e) { const r = canvas.getBoundingClientRect(); return { x: toFeet(e.clientX - r.left), y: toFeet(e.clientY - r.top) }; }
+function itemAt(fx, fy) { for (let i = items.length-1; i >= 0; i--) { const it = items[i]; const bb = getItemAABB(it); if (fx >= bb.x && fx <= bb.x+bb.w && fy >= bb.y && fy <= bb.y+bb.h) return it; } return null; }
+
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  hideContextMenu();
+  const m = getMouseFeet(e);
+
+  if (frontageMode) { handleFrontageClick(m.x, m.y); return; }
+  if (lineDrawing) return; // handled by click
+
+  // Street label dragging
+  if (streetLabelHitTest(m.x, m.y)) {
+    const pos = getStreetLabelPos();
+    draggingStreetLabel = true;
+    streetLabelDragOff = { x: m.x - pos.x, y: m.y - pos.y };
+    return;
+  }
+
+  if (selected && TYPES[selected.type].resizable) {
+    const hx = selected.x + selected.w, hy = selected.y + selected.h;
+    if (Math.abs(m.x-hx) < 1.5 && Math.abs(m.y-hy) < 1.5) {
+      resizing = { item: selected, startW: selected.w, startH: selected.h, startMx: m.x, startMy: m.y };
+      draw(); return;
+    }
+  }
+  const item = itemAt(m.x, m.y);
+  if (item) { selected = item; dragging = item; dragOff = { x: m.x-item.x, y: m.y-item.y }; }
+  else { selected = null; }
+  draw();
+});
+
+canvas.addEventListener('click', (e) => {
+  if (!lineDrawing) return;
+  const m = getMouseFeet(e);
+  let pt;
+  if (lineDrawing.points.length === 0) {
+    pt = { x: snap(m.x), y: snap(m.y) };
+  } else {
+    pt = snapCardinal(lineDrawing.points[lineDrawing.points.length - 1], { x: m.x, y: m.y });
+  }
+  lineDrawing.points.push(pt);
+  draw();
+});
+
+canvas.addEventListener('dblclick', (e) => {
+  if (lineDrawing) { finishLine(); e.preventDefault(); }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  const m = getMouseFeet(e);
+  document.getElementById('mouse-pos').textContent = Math.round(m.x) + "', " + Math.round(m.y) + "'";
+  if (lineDrawing && lineDrawing.points.length >= 1) {
+    linePreview = snapCardinal(lineDrawing.points[lineDrawing.points.length - 1], { x: m.x, y: m.y });
+    draw();
+    return;
+  }
+  if (draggingStreetLabel) {
+    streetLabel.x = m.x - streetLabelDragOff.x;
+    streetLabel.y = m.y - streetLabelDragOff.y;
+    draw(); return;
+  }
+  if (resizing) {
+    resizing.item.w = snap(Math.max(2, resizing.startW + m.x - resizing.startMx));
+    resizing.item.h = snap(Math.max(2, resizing.startH + m.y - resizing.startMy));
+    draw();
+  } else if (dragging) {
+    dragging.x = snap(m.x-dragOff.x);
+    dragging.y = snap(m.y-dragOff.y);
+    // Clamp using AABB
+    const dbb = getItemAABB(dragging);
+    if (dbb.x < 0) dragging.x -= dbb.x;
+    if (dbb.y < 0) dragging.y -= dbb.y;
+    if (dbb.x + dbb.w > LOT_W) dragging.x -= (dbb.x + dbb.w - LOT_W);
+    if (dbb.y + dbb.h > LOT_H) dragging.y -= (dbb.y + dbb.h - LOT_H);
+    draw();
+  } else {
+    if (selected && TYPES[selected.type].resizable) {
+      const hx = selected.x+selected.w, hy = selected.y+selected.h;
+      canvas.style.cursor = (Math.abs(m.x-hx)<1.5 && Math.abs(m.y-hy)<1.5) ? 'nwse-resize' : 'crosshair';
+    } else canvas.style.cursor = 'crosshair';
+    const h = itemAt(m.x, m.y);
+    if (h !== hoveredItem) { hoveredItem = h; draw(); }
+  }
+});
+
+canvas.addEventListener('mouseup', () => {
+  draggingStreetLabel = false;
+  const wasDragging = dragging || resizing;
+  dragging = null; resizing = null;
+  if (wasDragging && showSpikes) { computeGoldenSpikes(); draw(); }
+});
+
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  const m = getMouseFeet(e);
+
+  // Street label
+  if (streetLabelHitTest(m.x, m.y)) { showStreetLabelContextMenu(e.clientX, e.clientY); return; }
+
+  // Check lines first
+  const nearLine = findNearestLine(m.x, m.y, 5);
+  if (nearLine && !itemAt(m.x, m.y)) {
+    showLineContextMenu(e.clientX, e.clientY, nearLine);
+    return;
+  }
+
+  const item = itemAt(m.x, m.y);
+  if (item) { selected = item; draw(); showContextMenu(e.clientX, e.clientY, item); }
+});
+
+/* ===== UI CONTROLS & EVENT HANDLERS ===== */
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'Escape' && lineDrawing) { finishLine(); return; }
+  if (e.key === 'Escape' && frontageMode) { toggleFrontage(); return; }
+  if (!selected) return;
+  if (e.key === 'r' || e.key === 'R') { selected.rotation = ((selected.rotation || 0) + 45) % 360; const bb = getItemAABB(selected); selected.x = snap(Math.max(0, Math.min(selected.x, LOT_W - bb.w))); selected.y = snap(Math.max(0, Math.min(selected.y, LOT_H - bb.h))); draw(); }
+  if (e.key === 'Delete' || e.key === 'Backspace') { items = items.filter(i => i.id !== selected.id); selected = null; draw(); }
+  if (e.key === 'ArrowLeft')  { e.preventDefault(); selected.x = snap(selected.x-GRID); clampItemToLot(selected); draw(); }
+  if (e.key === 'ArrowRight') { e.preventDefault(); selected.x = snap(selected.x+GRID); clampItemToLot(selected); draw(); }
+  if (e.key === 'ArrowUp')    { e.preventDefault(); selected.y = snap(selected.y-GRID); clampItemToLot(selected); draw(); }
+  if (e.key === 'ArrowDown')  { e.preventDefault(); selected.y = snap(selected.y+GRID); clampItemToLot(selected); draw(); }
+  if (e.key === 'd' || e.key === 'D') {
+    const c = { ...selected, id: Date.now()+Math.random(), x: snap(selected.x+2), y: snap(selected.y+2), camper: null };
+    items.push(c); selected = c; draw();
+  }
+});
+
+/* ===== CONTEXT MENU ===== */
+function showContextMenu(x, y, item) {
+  const menu = document.getElementById('context-menu');
+  const t = TYPES[item.type];
+  const isCamp = (item.type === 'tent' || item.type === 'shiftpod');
+  menu.innerHTML = `
+    <div class="cm-item" style="color:#94a3b8;font-weight:600;cursor:default">${item.label} (${item.w}x${item.h})${(item.rotation||0) ? ' ∠'+item.rotation+'°' : ''}${item.camper ? ' — '+item.camper : ''}</div>
+    <div class="cm-sep"></div>
+    <div class="cm-item" onclick="rotateItem('${item.id}')">↻ Rotate (R)</div>
+    <div class="cm-item" onclick="dupeItem('${item.id}')">⧉ Duplicate (D)</div>
+    <div class="cm-item" onclick="relabelItem('${item.id}')">✏️ Rename</div>
+    ${t.resizable ? `<div class="cm-item" onclick="resizeItem('${item.id}')">↔ Resize...</div>` : ''}
+    <div class="cm-item" style="display:flex;align-items:center;gap:8px" onclick="event.stopPropagation()">🎨 Color <input type="color" value="${item.customColor || t.color}" onchange="setItemColor('${item.id}',this.value)" style="width:28px;height:20px;border:none;background:none;cursor:pointer;padding:0"></div>
+    ${isCamp ? `<div class="cm-item" onclick="openCamperModal('${item.id}')">👤 ${item.camper ? 'Reassign' : 'Assign'} Camper</div>` : ''}
+    <div class="cm-sep"></div>
+    <div class="cm-item danger" onclick="deleteItem('${item.id}')">🗑 Delete</div>
+  `;
+  menu.style.display = 'block';
+  menu.style.left = Math.min(x, window.innerWidth-180) + 'px';
+  menu.style.top = Math.min(y, window.innerHeight-250) + 'px';
+}
+
+function showLineContextMenu(x, y, line) {
+  const menu = document.getElementById('context-menu');
+  const lineLabels = { water: '💧 Water Line', power: '⚡ Power Line', fence: '🔒 Fence', firelane: '🚒 Fire Lane' };
+  const label = lineLabels[line.type] || line.type;
+  menu.innerHTML = `
+    <div class="cm-item" style="color:#94a3b8;font-weight:600;cursor:default">${label}</div>
+    <div class="cm-sep"></div>
+    <div class="cm-item danger" onclick="deleteLine(${line.id})">🗑 Delete Line</div>
+  `;
+  menu.style.display = 'block';
+  menu.style.left = Math.min(x, window.innerWidth-180) + 'px';
+  menu.style.top = Math.min(y, window.innerHeight-200) + 'px';
+}
+
+function deleteLine(id) {
+  lines = lines.filter(l => l.id !== id);
+  hideContextMenu();
+  draw();
+}
+
+function hideContextMenu() { document.getElementById('context-menu').style.display = 'none'; }
+document.addEventListener('click', (e) => { if (!e.target.closest('#context-menu')) hideContextMenu(); });
+
+function spikeRedraw() { if (showSpikes) computeGoldenSpikes(); draw(); }
+function rotateItem(id) { const i = items.find(x=>x.id==id); if(!i)return; i.rotation=((i.rotation||0)+45)%360; const bb=getItemAABB(i); i.x=snap(Math.max(0,Math.min(i.x,LOT_W-bb.w))); i.y=snap(Math.max(0,Math.min(i.y,LOT_H-bb.h))); hideContextMenu();spikeRedraw(); }
+function dupeItem(id) { const i=items.find(x=>x.id==id); if(!i)return; const c={...i,id:Date.now()+Math.random(),x:snap(i.x+2),y:snap(i.y+2),camper:null}; items.push(c); selected=c; hideContextMenu();spikeRedraw(); }
+function relabelItem(id) { const i=items.find(x=>x.id==id); if(!i)return; const n=prompt('Rename:',i.label); if(n)i.label=n; hideContextMenu();draw(); }
+function setItemColor(id, color) { const i=items.find(x=>x.id==id); if(!i)return; i.customColor=color; draw(); }
+function resizeItem(id) { const i=items.find(x=>x.id==id); if(!i)return; const d=prompt('Width Height:',i.w+' '+i.h); if(d){const p=d.split(/[×x ,]+/).map(Number);if(p.length>=2&&p[0]>0&&p[1]>0){i.w=snap(p[0]);i.h=snap(p[1]);}} hideContextMenu();spikeRedraw(); }
+function deleteItem(id) { items=items.filter(i=>i.id!=id); selected=null; hideContextMenu();spikeRedraw(); }
+
+// ===== CAMPER MODAL =====
+function openCamperModal(id) {
+  hideContextMenu();
+  const item = items.find(i => i.id == id);
+  if (!item) return;
+  camperModalTarget = item;
+  const list = document.getElementById('camper-roster-list');
+  document.getElementById('camper-modal-title').textContent = 'Assign Camper to ' + item.label;
+  document.getElementById('clear-camper-btn').style.display = item.camper ? 'block' : 'none';
+  list.innerHTML = '<div style="color:#94a3b8;font-size:12px;padding:8px">Use manual entry below to assign a camper name.</div>';
+  document.getElementById('camper-modal').classList.add('show');
+}
+
+function closeCamperModal() { document.getElementById('camper-modal').classList.remove('show'); camperModalTarget = null; }
+
+function assignCustomCamper() {
+  if (!camperModalTarget) return;
+  const name = prompt('Camper name / playa name:', camperModalTarget.camper || '');
+  if (name) { camperModalTarget.camper = name; }
+  closeCamperModal(); draw();
+}
+
+function clearCurrentCamper() {
+  if (!camperModalTarget) return;
+  camperModalTarget.camper = null;
+  closeCamperModal(); draw();
+}
+
+/* ===== EXPORT (JSON/JPEG/PRINT) ===== */
+function saveJSON() {
+  const brs = items.filter(i => TYPES[i.type].cat === 'brs');
+  const shades = items.filter(i => TYPES[i.type].cat === 'shade');
+  const pads = items.filter(i => i.type === 'tent' || i.type === 'shiftpod');
+  const art = items.filter(i => TYPES[i.type].cat === 'art');
+  const func = items.filter(i => TYPES[i.type].cat === 'func');
+  const vehicles = items.filter(i => TYPES[i.type].cat === 'vehicle');
+
+  let angledEdges = [];
+  [...brs, ...shades].forEach(b => {
+    const edges = getExteriorEdges(b);
+    Object.entries(edges).forEach(([side, ext]) => {
+      if (ext) angledEdges.push({ structure: b.label, side, lengthFt: (side==='top'||side==='bottom') ? b.w : b.h, dropFt: ANGLED_EXT });
+    });
+  });
+
+  const exportData = {
+    meta: { name: campInfo.name || 'Camp Layout', lotSize: LOT_W + 'x' + LOT_H, exportDate: new Date().toISOString(), version: 3 },
+    summary: {
+      totalItems: items.length,
+      brsStructures: brs.length,
+      alumiNetPanels: shades.length,
+      angledSidePanels: angledEdges.length,
+      tentPads: pads.length,
+      assignedCampers: pads.filter(t => t.camper).length,
+      unassignedPads: pads.filter(t => !t.camper).length,
+      totalShadeArea: [...brs, ...shades].reduce((s, i) => s + i.w * i.h, 0) + ' sqft',
+    },
+    structures: {
+      brs: brs.map(i => ({ label: i.label, type: i.type, position: { x: i.x, y: i.y }, size: { w: i.w, h: i.h }, exteriorEdges: getExteriorEdges(i) })),
+      aluminet: shades.map(i => ({ label: i.label, position: { x: i.x, y: i.y }, size: { w: i.w, h: i.h } })),
+      angledPanels: angledEdges,
+    },
+    camping: {
+      pads: pads.map(i => ({ label: i.label, type: i.type, camper: i.camper || 'unassigned', position: { x: i.x, y: i.y }, size: { w: i.w, h: i.h } })),
+    },
+    art: art.map(i => ({ label: i.label, type: i.type, position: { x: i.x, y: i.y }, size: { w: i.w, h: i.h } })),
+    functional: func.map(i => ({ label: i.label, type: i.type, position: { x: i.x, y: i.y }, size: { w: i.w, h: i.h } })),
+    vehicles: vehicles.map(i => ({ label: i.label, type: i.type, position: { x: i.x, y: i.y }, size: { w: i.w, h: i.h } })),
+    goldenSpikes: goldenSpikes.map(sp => ({
+      label: sp.label,
+      position: { x: sp.x, y: sp.y },
+      fromLeftEdge: sp.x + ' ft',
+      fromStreet: (LOT_H - sp.y) + ' ft',
+      maxMeasurementDist: Math.round(sp.maxDist) + ' ft',
+    })),
+    _raw: items,
+    _lotSize: { w: LOT_W, h: LOT_H },
+    _lines: lines,
+    _campInfo: campInfo,
+    _frontage: [...frontageEdges],
+    _streetLabel: { ...streetLabel },
+  };
+
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'camp-layout.json'; a.click();
+  toast('Layout saved to file', 3000);
+}
+
+function loadJSON() {
+  const input = document.createElement('input'); input.type='file'; input.accept='.json';
+  input.onchange = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        items = d._raw || d;
+        if (d._lotSize) {
+          LOT_W = d._lotSize.w || 100;
+          LOT_H = d._lotSize.h || 100;
+          document.getElementById('lot-w').value = LOT_W;
+          document.getElementById('lot-h').value = LOT_H;
+          updateCanvasSize();
+        }
+        lines = d._lines || [];
+        campInfo = d._campInfo || { name:'', first:'', last:'', playa:'', email:'', phone:'', version:'v1' };
+        frontageEdges = d._frontage || ['bottom'];
+        if (d._streetLabel) { streetLabel = { text: 'STREET', x: null, y: null, visible: true, rotation: 0, ...d._streetLabel }; }
+        document.getElementById('street-label-btn').style.display = streetLabel.visible ? 'none' : '';
+        selected = null;
+        if (showSpikes) computeGoldenSpikes();
+        draw();
+        toast('Layout loaded from ' + file.name, 3000);
+      } catch(e) { alert('Invalid file'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function exportJPEG() {
+  const W = LOT_W * SCALE, H = LOT_H * SCALE;
+  const expCanvas = document.createElement('canvas');
+  const s = 2; expCanvas.width = W*s; expCanvas.height = H*s;
+  const ec = expCanvas.getContext('2d'); ec.scale(s, s);
+  ec.fillStyle = '#1a1a2e'; ec.fillRect(0, 0, W, H);
+
+  // Camp name
+  if (campInfo.name) {
+    ec.fillStyle = 'rgba(255,255,255,0.7)';
+    ec.font = 'bold 18px system-ui';
+    ec.textAlign = 'center';
+    ec.fillText(campInfo.name, W/2, 24);
+  }
+
+  ec.strokeStyle = 'rgba(255,255,255,0.08)'; ec.lineWidth = 1;
+  for (let i = 0; i <= LOT_W; i += 10) { ec.beginPath(); ec.moveTo(toPx(i),0); ec.lineTo(toPx(i),H); ec.stroke(); }
+  for (let i = 0; i <= LOT_H; i += 10) { ec.beginPath(); ec.moveTo(0,toPx(i)); ec.lineTo(W,toPx(i)); ec.stroke(); }
+
+  drawStreetLabel(ec, 1);
+
+  ec.fillStyle='rgba(255,255,255,0.2)'; ec.font='9px system-ui'; ec.textAlign='left';
+  for (let i=0;i<=LOT_W;i+=10) ec.fillText(i+"'",toPx(i)+2,10);
+  for (let i=0;i<=LOT_H;i+=10) ec.fillText(i+"'",2,toPx(i)+10);
+
+  const order = ['shade','halo','camp','vehicle','brs','func','art'];
+  const sorted = [...items].sort((a,b)=>order.indexOf(TYPES[a.type].cat)-order.indexOf(TYPES[b.type].cat));
+
+  for (const item of sorted) {
+    const t=TYPES[item.type];
+    const itemColor = item.customColor || t.color;
+    const fillAlpha = (t.cat==='shade'||t.cat==='halo') ? '40' : '80';
+    const isDashed = (t.cat==='shade'||t.cat==='halo');
+
+    drawRotatedItem(ec, item, (x, y, w, h) => {
+      if (t.cat==='brs') { ec.fillStyle='rgba(79,70,229,0.08)'; ec.fillRect(x-4,y-4,w+8,h+8); }
+      drawItemShape(ec, item, x, y, w, h, itemColor + fillAlpha, itemColor, 1, isDashed);
+      // Halos inside rotation context
+      if (t.cat === 'brs' || t.cat === 'shade') {
+        const edges = getExteriorEdges(item);
+        if (edges.top||edges.bottom||edges.left||edges.right) {
+          const ext = toPx(ANGLED_EXT);
+          ec.fillStyle='rgba(161,98,7,0.15)';ec.strokeStyle='rgba(161,98,7,0.3)';ec.lineWidth=1;ec.setLineDash([3,3]);
+          if(edges.top){ec.beginPath();ec.moveTo(x,y);ec.lineTo(x+w,y);ec.lineTo(x+w+(edges.right?ext:0),y-ext);ec.lineTo(x-(edges.left?ext:0),y-ext);ec.closePath();ec.fill();ec.stroke();}
+          if(edges.bottom){ec.beginPath();ec.moveTo(x,y+h);ec.lineTo(x+w,y+h);ec.lineTo(x+w+(edges.right?ext:0),y+h+ext);ec.lineTo(x-(edges.left?ext:0),y+h+ext);ec.closePath();ec.fill();ec.stroke();}
+          if(edges.left){ec.beginPath();ec.moveTo(x,y);ec.lineTo(x,y+h);ec.lineTo(x-ext,y+h+(edges.bottom?ext:0));ec.lineTo(x-ext,y-(edges.top?ext:0));ec.closePath();ec.fill();ec.stroke();}
+          if(edges.right){ec.beginPath();ec.moveTo(x+w,y);ec.lineTo(x+w,y+h);ec.lineTo(x+w+ext,y+h+(edges.bottom?ext:0));ec.lineTo(x+w+ext,y-(edges.top?ext:0));ec.closePath();ec.fill();ec.stroke();}
+          ec.setLineDash([]);
+        }
+      }
+      ec.fillStyle='#e2e8f0'; ec.font=(w<toPx(8))?'9px system-ui':'11px system-ui'; ec.textAlign='center';
+      ec.fillText(item.label, x+w/2, y+h/2+(item.camper?-2:4));
+      if (item.camper) { ec.fillStyle='#fbbf24'; ec.font='9px system-ui'; ec.fillText(item.camper, x+w/2, y+h/2+12); }
+    });
+
+    const cx = toPx(item.x+item.w/2), cy = toPx(item.y+item.h/2);
+    if (item.type === 'fuel') drawRadiusCircles(ec, cx, cy, [10,20,50], '#ef4444');
+    else if (item.type === 'generator') drawRadiusCircles(ec, cx, cy, [10], '#ef4444');
+  }
+
+  // Lines
+  drawLines(ec, lines);
+
+  // Frontage
+  drawFrontageEdges(ec);
+
+  if (showSpikes) { computeGoldenSpikes(); drawGoldenSpikes(ec, s); }
+
+  if (showSpikes && goldenSpikes.length > 0) {
+    ec.fillStyle='rgba(234,179,8,0.9)'; ec.font='bold 10px system-ui'; ec.textAlign='left';
+    ec.fillText('GOLDEN SPIKES:', 8, H - 28);
+    ec.font='10px system-ui';
+    const legend = goldenSpikes.map(sp => sp.label + ': ' + sp.x + "' from left, " + (LOT_H-sp.y) + "' from street").join('  |  ');
+    ec.fillText(legend, 8, H - 16);
+  }
+
+  ec.fillStyle='#e2e8f0'; ec.font='bold 14px system-ui'; ec.textAlign='right';
+  ec.fillText('Camp Layout — ' + LOT_W + 'x' + LOT_H + ' ft', W-10, H-8);
+
+  expCanvas.toBlob((blob) => { const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='camp-layout.jpg'; a.click(); }, 'image/jpeg', 0.92);
+}
+
+// ===== PRINT EXPORT =====
+function exportPrintJPEG() {
+  const PW = 1700, PH = 2200;
+  const pc = document.createElement('canvas');
+  pc.width = PW; pc.height = PH;
+  const p = pc.getContext('2d');
+
+  // White bg
+  p.fillStyle = '#fff';
+  p.fillRect(0, 0, PW, PH);
+
+  // Header
+  const headerH = 300, legendH = 200;
+  const layoutH = PH - headerH - legendH;
+  let yOff = 30;
+
+  p.fillStyle = '#000';
+  p.font = 'bold 36px system-ui';
+  p.textAlign = 'center';
+  p.fillText(campInfo.name || 'Camp Layout', PW/2, yOff + 36);
+  yOff += 56;
+
+  p.font = '18px system-ui';
+  const contact = [campInfo.first, campInfo.last].filter(Boolean).join(' ');
+  const playaStr = campInfo.playa ? ' (' + campInfo.playa + ')' : '';
+  const contactParts = ['Contact: ' + (contact || 'N/A') + playaStr, campInfo.email, campInfo.phone].filter(Boolean).join(' | ');
+  p.fillText(contactParts, PW/2, yOff + 18);
+  yOff += 30;
+
+  const now = new Date();
+  const dateStr = String(now.getMonth()+1).padStart(2,'0') + '/' + String(now.getDate()).padStart(2,'0') + '/' + now.getFullYear();
+  p.fillText('Version: ' + (campInfo.version || 'v1') + ' | Date: ' + dateStr, PW/2, yOff + 18);
+  yOff += 30;
+
+  p.fillText(LOT_W + "' × " + LOT_H + "'", PW/2, yOff + 18);
+
+  // Layout area
+  const pad = 60;
+  const availW = PW - pad*2, availH = layoutH - pad*2;
+  const lotAspect = LOT_W / LOT_H;
+  const areaAspect = availW / availH;
+  let scale, offX, offY;
+  if (lotAspect > areaAspect) {
+    scale = availW / (LOT_W * SCALE);
+    offX = pad;
+    offY = headerH + pad + (availH - LOT_H * SCALE * scale) / 2;
+  } else {
+    scale = availH / (LOT_H * SCALE);
+    offX = pad + (availW - LOT_W * SCALE * scale) / 2;
+    offY = headerH + pad;
+  }
+
+  p.save();
+  p.translate(offX, offY);
+
+  const W = LOT_W * SCALE * scale, H = LOT_H * SCALE * scale;
+
+  // Grid
+  p.strokeStyle = '#ddd'; p.lineWidth = 0.5;
+  for (let i = 0; i <= LOT_W; i += 10) { p.beginPath(); p.moveTo(toPx(i)*scale, 0); p.lineTo(toPx(i)*scale, H); p.stroke(); }
+  for (let i = 0; i <= LOT_H; i += 10) { p.beginPath(); p.moveTo(0, toPx(i)*scale); p.lineTo(W, toPx(i)*scale); p.stroke(); }
+
+  // Scale labels
+  p.fillStyle = '#999'; p.font = (8*scale) + 'px system-ui'; p.textAlign = 'left';
+  for (let i = 0; i <= LOT_W; i += 10) p.fillText(i+"'", toPx(i)*scale+2, 10*scale);
+
+  // Street label
+  drawStreetLabelPrint(p, scale);
+
+  // Print color mapping
+  function printColors(item) {
+    const t = TYPES[item.type];
+    const cat = t.cat;
+    if (cat === 'brs') return { fill: '#c0c0c0', stroke: '#000' };
+    if (cat === 'camp') return { fill: '#d4edda', stroke: '#155724' };
+    if (cat === 'vehicle') return { fill: '#e0e0e0', stroke: '#333' };
+    if (cat === 'shade' || cat === 'halo') return { fill: '#fff3cd', stroke: '#856404' };
+    if (item.customColor) {
+      // lighten custom color
+      return { fill: item.customColor + '60', stroke: '#333' };
+    }
+    return { fill: '#d1ecf1', stroke: '#0c5460' };
+  }
+
+  const order = ['shade','halo','camp','vehicle','brs','func','art'];
+  const sorted = [...items].sort((a,b)=>order.indexOf(TYPES[a.type].cat)-order.indexOf(TYPES[b.type].cat));
+  const usedTypes = new Set();
+
+  for (const item of sorted) {
+    const t = TYPES[item.type];
+    const colors = printColors(item);
+    usedTypes.add(item.type);
+
+    drawRotatedItemScaled(p, item, scale, (x, y, w, h) => {
+      if (item.type === 'circle') {
+        p.beginPath(); p.ellipse(x+w/2, y+h/2, w/2, h/2, 0, 0, Math.PI*2);
+        p.fillStyle = colors.fill; p.fill();
+        p.strokeStyle = colors.stroke; p.lineWidth = 1.5*scale; p.stroke();
+      } else if (item.type === 'polygon') {
+        drawOctagon(p, x, y, w, h);
+        p.fillStyle = colors.fill; p.fill();
+        p.strokeStyle = colors.stroke; p.lineWidth = 1.5*scale; p.stroke();
+      } else {
+        p.fillStyle = colors.fill; p.fillRect(x, y, w, h);
+        p.strokeStyle = colors.stroke; p.lineWidth = 1.5*scale; p.strokeRect(x, y, w, h);
+      }
+      p.fillStyle = '#000'; p.font = (w < toPx(8)*scale ? 8*scale : 10*scale) + 'px system-ui'; p.textAlign = 'center';
+      p.fillText(item.label, x+w/2, y+h/2+(item.camper?-2*scale:4*scale));
+      if (item.camper) { p.font = (8*scale)+'px system-ui'; p.fillText(item.camper, x+w/2, y+h/2+12*scale); }
+    });
+
+    const cx = toPx(item.x+item.w/2)*scale, cy = toPx(item.y+item.h/2)*scale;
+    if (item.type === 'fuel') drawRadiusCircles(p, cx, cy, [10,20,50], '#000000', scale);
+    else if (item.type === 'generator') drawRadiusCircles(p, cx, cy, [10], '#000000', scale);
+  }
+
+  // Lines (water, power, fence, firelane)
+  for (const line of lines) {
+    if (line.points.length < 2) continue;
+    if (line.type === 'firelane') { drawFireLane(p, line.points, scale, true); continue; }
+    if (line.type === 'fence') {
+      p.save();
+      p.strokeStyle = '#000'; p.lineWidth = 2 * scale; p.setLineDash([]);
+      p.beginPath();
+      p.moveTo(toPx(line.points[0].x)*scale, toPx(line.points[0].y)*scale);
+      for (let i = 1; i < line.points.length; i++) p.lineTo(toPx(line.points[i].x)*scale, toPx(line.points[i].y)*scale);
+      p.stroke();
+      drawFenceTicks(p, line.points, scale);
+      const mid = Math.floor(line.points.length / 2);
+      p.fillStyle = '#000'; p.font = 'bold ' + (9*scale) + 'px system-ui'; p.textAlign = 'center';
+      p.fillText('FENCE', toPx(line.points[mid].x)*scale, toPx(line.points[mid].y)*scale - 4*scale);
+      p.restore();
+      continue;
+    }
+    const isWater = line.type === 'water';
+    p.save();
+    p.strokeStyle = '#000';
+    p.lineWidth = 2 * scale;
+    p.setLineDash(isWater ? [8*scale, 4*scale] : [4*scale, 2*scale, 2*scale, 2*scale]);
+    p.beginPath();
+    p.moveTo(toPx(line.points[0].x)*scale, toPx(line.points[0].y)*scale);
+    for (let i = 1; i < line.points.length; i++) {
+      p.lineTo(toPx(line.points[i].x)*scale, toPx(line.points[i].y)*scale);
+    }
+    p.stroke();
+    p.setLineDash([]);
+    const mid = Math.floor(line.points.length / 2);
+    const mx = toPx(line.points[mid].x)*scale, my = toPx(line.points[mid].y)*scale;
+    p.fillStyle = '#000'; p.font = 'bold ' + (9*scale) + 'px system-ui'; p.textAlign = 'center';
+    p.fillText(isWater ? 'WATER' : 'POWER', mx, my - 4*scale);
+    p.restore();
+  }
+
+  // Frontage
+  drawFrontageEdges(p, scale, '#000', '#000');
+
+  p.restore();
+
+  // Legend
+  const legendY = PH - legendH + 20;
+  p.fillStyle = '#000'; p.font = 'bold 16px system-ui'; p.textAlign = 'left';
+  p.fillText('Legend', 60, legendY);
+
+  let lx = 60, ly = legendY + 24;
+  const legendCols = 5;
+  const colW = (PW - 120) / legendCols;
+  let col = 0;
+  for (const type of usedTypes) {
+    const t = TYPES[type];
+    if (!t) continue;
+    const cx = lx + (col % legendCols) * colW;
+    const cy = ly + Math.floor(col / legendCols) * 28;
+    const dummyItem = { type };
+    const colors = printColors(dummyItem);
+    p.fillStyle = colors.fill; p.fillRect(cx, cy - 10, 14, 14);
+    p.strokeStyle = colors.stroke; p.lineWidth = 1; p.strokeRect(cx, cy - 10, 14, 14);
+    p.fillStyle = '#000'; p.font = '12px system-ui'; p.textAlign = 'left';
+    p.fillText(t.label, cx + 20, cy + 1);
+    col++;
+  }
+  // Water/power legend
+  if (lines.some(l => l.type === 'water')) {
+    const cx = lx + (col % legendCols) * colW, cy = ly + Math.floor(col / legendCols) * 28;
+    p.setLineDash([6,3]); p.strokeStyle = '#000'; p.lineWidth = 2;
+    p.beginPath(); p.moveTo(cx, cy-3); p.lineTo(cx+14, cy-3); p.stroke(); p.setLineDash([]);
+    p.fillStyle = '#000'; p.font = '12px system-ui'; p.fillText('Water Line', cx+20, cy+1);
+    col++;
+  }
+  if (lines.some(l => l.type === 'power')) {
+    const cx = lx + (col % legendCols) * colW, cy = ly + Math.floor(col / legendCols) * 28;
+    p.setLineDash([4,2,2,2]); p.strokeStyle = '#000'; p.lineWidth = 2;
+    p.beginPath(); p.moveTo(cx, cy-3); p.lineTo(cx+14, cy-3); p.stroke(); p.setLineDash([]);
+    p.fillStyle = '#000'; p.font = '12px system-ui'; p.fillText('Power Line', cx+20, cy+1);
+    col++;
+  }
+  if (lines.some(l => l.type === 'fence')) {
+    const cx = lx + (col % legendCols) * colW, cy = ly + Math.floor(col / legendCols) * 28;
+    p.strokeStyle = '#000'; p.lineWidth = 2; p.setLineDash([]);
+    p.beginPath(); p.moveTo(cx, cy-3); p.lineTo(cx+14, cy-3); p.stroke();
+    // tick marks
+    p.beginPath(); p.moveTo(cx+4, cy-6); p.lineTo(cx+4, cy); p.stroke();
+    p.beginPath(); p.moveTo(cx+10, cy-6); p.lineTo(cx+10, cy); p.stroke();
+    p.fillStyle = '#000'; p.font = '12px system-ui'; p.fillText('Fence', cx+20, cy+1);
+    col++;
+  }
+  if (lines.some(l => l.type === 'firelane')) {
+    const cx = lx + (col % legendCols) * colW, cy = ly + Math.floor(col / legendCols) * 28;
+    p.fillStyle = 'rgba(0,0,0,0.1)'; p.fillRect(cx, cy-8, 14, 12);
+    p.strokeStyle = '#000'; p.lineWidth = 1; p.setLineDash([3,2]);
+    p.strokeRect(cx, cy-8, 14, 12); p.setLineDash([]);
+    p.fillStyle = '#000'; p.font = '12px system-ui'; p.fillText('Fire Lane', cx+20, cy+1);
+    col++;
+  }
+
+  // Download
+  const nameSlug = (campInfo.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').substring(0, 12);
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const dd = String(now.getDate()).padStart(2,'0');
+  let filename = nameSlug ? nameSlug + '_' + mm + '.' + dd + '.jpg' : 'camp_layout_' + mm + '.' + dd + '.jpg';
+  // Ensure ≤20 chars before .jpg
+  const base = filename.replace(/\.jpg$/, '');
+  if (base.length > 20) filename = base.substring(0, 20) + '.jpg';
+
+  pc.toBlob((blob) => { const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); }, 'image/jpeg', 0.95);
+  toast('Print export saved', 3000);
+}
+
+// ===== GOLDEN SPIKES =====
+let goldenSpikes = [];
+let showSpikes = false;
+
+function toggleGoldenSpikes() {
+  showSpikes = !showSpikes;
+  document.getElementById('spike-btn').style.background = showSpikes ? 'rgba(234,179,8,0.3)' : '';
+  if (showSpikes) computeGoldenSpikes();
+  else goldenSpikes = [];
+  draw();
+}
+
+/* ===== GOLDEN SPIKES COMPUTATION ===== */
+function computeGoldenSpikes(numSpikes) {
+  const structures = items.filter(i => {
+    const cat = TYPES[i.type].cat;
+    return cat === 'brs' || cat === 'func' || cat === 'art';
+  });
+  if (structures.length === 0) { goldenSpikes = []; return; }
+
+  const points = [];
+  for (const s of structures) {
+    points.push({ x: s.x, y: s.y });
+    points.push({ x: s.x + s.w, y: s.y });
+    points.push({ x: s.x, y: s.y + s.h });
+    points.push({ x: s.x + s.w, y: s.y + s.h });
+  }
+
+  const targets = structures.map(s => ({ x: s.x + s.w/2, y: s.y + s.h/2, label: s.label }));
+  const K = numSpikes || (structures.length >= 10 ? 3 : 2);
+
+  const candidates = [];
+  const shadeStructures = items.filter(i => TYPES[i.type].cat === 'brs' || TYPES[i.type].cat === 'shade');
+  for (const s of shadeStructures) {
+    [{x: s.x, y: s.y}, {x: s.x + s.w, y: s.y}, {x: s.x, y: s.y + s.h}, {x: s.x + s.w, y: s.y + s.h}].forEach(c => {
+      if (!candidates.some(e => e.x === c.x && e.y === c.y)) {
+        candidates.push({ x: c.x, y: c.y, struct: s.label });
+      }
+    });
+  }
+
+  if (candidates.length < K) { goldenSpikes = []; return; }
+
+  function edgeDist(sp) {
+    return Math.min(sp.x, LOT_W - sp.x, sp.y, LOT_H - sp.y);
+  }
+
+  function score(spikes) {
+    let worst = 0;
+    for (const t of targets) {
+      let best = Infinity;
+      for (const sp of spikes) {
+        const d = Math.sqrt((t.x - sp.x)**2 + (t.y - sp.y)**2);
+        if (d < best) best = d;
+      }
+      if (best > worst) worst = best;
+    }
+    const edgePenalty = spikes.reduce((sum, sp) => sum + edgeDist(sp) * 0.3, 0);
+    return worst + edgePenalty;
+  }
+
+  let bestSpikes = [];
+  let bestScore = Infinity;
+
+  const iterations = 200;
+  for (let iter = 0; iter < iterations; iter++) {
+    const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+    const trial = shuffled.slice(0, K);
+
+    let improved = true;
+    let maxImprovements = 20;
+    while (improved && maxImprovements-- > 0) {
+      improved = false;
+      for (let si = 0; si < K; si++) {
+        const current = score(trial);
+        let bestSwap = null;
+        let bestSwapScore = current;
+        const sample = candidates.sort(() => Math.random() - 0.5).slice(0, 80);
+        for (const c of sample) {
+          const old = trial[si];
+          trial[si] = c;
+          const s = score(trial);
+          if (s < bestSwapScore) {
+            bestSwapScore = s;
+            bestSwap = c;
+          }
+          trial[si] = old;
+        }
+        if (bestSwap && bestSwapScore < current) {
+          trial[si] = bestSwap;
+          improved = true;
+        }
+      }
+    }
+
+    const s = score(trial);
+    if (s < bestScore) {
+      bestScore = s;
+      bestSpikes = trial.map(sp => ({ ...sp }));
+    }
+  }
+
+  goldenSpikes = bestSpikes.map((sp, i) => ({
+    x: sp.x, y: sp.y,
+    label: String.fromCharCode(65 + i),
+    struct: sp.struct || '',
+    maxDist: 0,
+  }));
+
+  for (const sp of goldenSpikes) {
+    let worst = 0;
+    for (const t of targets) {
+      const d = Math.sqrt((t.x - sp.x)**2 + (t.y - sp.y)**2);
+      if (d > worst) worst = d;
+    }
+    sp.maxDist = worst;
+  }
+}
+
+function drawGoldenSpikes(ctx, scale) {
+  if (!showSpikes || goldenSpikes.length === 0) return;
+  const s = scale || 1;
+
+  const structures = items.filter(i => {
+    const cat = TYPES[i.type].cat;
+    return cat === 'brs' || cat === 'func' || cat === 'art';
+  });
+
+  ctx.save();
+  for (const struct of structures) {
+    const cx = struct.x + struct.w/2, cy = struct.y + struct.h/2;
+    let nearest = goldenSpikes[0], bestD = Infinity;
+    for (const sp of goldenSpikes) {
+      const d = Math.sqrt((cx-sp.x)**2 + (cy-sp.y)**2);
+      if (d < bestD) { bestD = d; nearest = sp; }
+    }
+    ctx.strokeStyle = 'rgba(234,179,8,0.15)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2,4]);
+    ctx.beginPath();
+    ctx.moveTo(toPx(nearest.x)*s, toPx(nearest.y)*s);
+    ctx.lineTo(toPx(cx)*s, toPx(cy)*s);
+    ctx.stroke();
+    const mx = (nearest.x + cx)/2, my = (nearest.y + cy)/2;
+    ctx.fillStyle = 'rgba(234,179,8,0.4)';
+    ctx.font = (8*s) + 'px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(Math.round(bestD) + "'", toPx(mx)*s, toPx(my)*s - 2*s);
+  }
+  ctx.setLineDash([]);
+
+  for (const sp of goldenSpikes) {
+    const px = toPx(sp.x)*s, py = toPx(sp.y)*s;
+    const r = 6*s;
+
+    ctx.fillStyle = 'rgba(234,179,8,0.2)';
+    ctx.beginPath(); ctx.arc(px, py, r*2, 0, Math.PI*2); ctx.fill();
+
+    ctx.fillStyle = '#eab308';
+    ctx.beginPath();
+    ctx.moveTo(px, py - r);
+    ctx.lineTo(px + r*0.7, py);
+    ctx.lineTo(px, py + r);
+    ctx.lineTo(px - r*0.7, py);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#fef08a'; ctx.lineWidth = 1.5*s;
+    ctx.stroke();
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.font = 'bold ' + (9*s) + 'px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(sp.label, px, py + 3*s);
+
+    ctx.fillStyle = '#fef08a';
+    ctx.font = (9*s) + 'px system-ui';
+    const fromStreet = LOT_H - sp.y;
+    ctx.fillText(sp.x + "' over, " + fromStreet + "' from street", px, py - r - 4*s);
+  }
+  ctx.restore();
+}
+
+draw();
+</script>
+</body>
+</html>
